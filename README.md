@@ -110,6 +110,22 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
+### Linux build
+
+On Linux with a standard GCC or Clang toolchain:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /usr/local
+```
+
+Note:
+
+- Linux packaging has been prepared in CMake through `install()` rules.
+- A native Linux binary build was not verified in this Windows session because no Linux toolchain was available here.
+
 ## Example
 
 The repository includes an end-to-end async example:
@@ -154,6 +170,11 @@ GitHub publishing assets:
 - `docs/GITHUB_METADATA.md`
 - `docs/PUBLISHING_CHECKLIST.md`
 - `wiki/`
+
+Release packaging:
+
+- Windows binary bundle: `artifacts/release/num8-lup-v1.0.0-win64.zip`
+- Linux source bundle: `artifacts/release/num8-lup-v1.0.0-linux-src.tar.gz`
 
 ## Repository Notes
 

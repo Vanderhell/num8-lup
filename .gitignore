@@ -1,6 +1,7 @@
 # Build directories
 /build/
 /build_*/
+/artifacts/
 /out/
 /bin/
 /lib/

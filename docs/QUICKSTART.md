@@ -8,6 +8,15 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
+Linux:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /usr/local
+```
+
 ## DLL outputs
 
 - `build/Release/num8lora_sender.dll`

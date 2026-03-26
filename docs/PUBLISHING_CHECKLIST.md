@@ -36,3 +36,4 @@
 - [ ] include legacy DLL and import library if compatibility distribution is intended
 - [ ] include public headers from `include/`
 - [ ] include changelog or release notes for the first public version
+- [ ] prepare Linux source or binary bundle if Linux consumers are expected

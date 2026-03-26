@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 
+#if defined(_WIN32) && defined(NUM8LORA_BUILD_SHARED)
+#define NUM8LORA_OP_API __declspec(dllexport)
+#elif defined(__GNUC__) && __GNUC__ >= 4
+#define NUM8LORA_OP_API __attribute__((visibility("default")))
+#else
+#define NUM8LORA_OP_API
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,22 +81,22 @@ typedef struct num8lora_op_nack_payload_s
     uint32_t expected_next_op_id;
 } num8lora_op_nack_payload_t;
 
-uint16_t num8lora_op_crc16_ccitt_false(const void* data, uint32_t len);
+NUM8LORA_OP_API uint16_t num8lora_op_crc16_ccitt_false(const void* data, uint32_t len);
 
-int num8lora_op_encode_beacon(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t seq, const num8lora_op_beacon_payload_t* p, uint32_t* out_len);
-int num8lora_op_encode_request(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_request_payload_t* p, uint32_t* out_len);
-int num8lora_op_encode_data(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_data_payload_t* p, uint32_t* out_len);
-int num8lora_op_encode_ack(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_ack_payload_t* p, uint32_t* out_len);
-int num8lora_op_encode_nack(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_nack_payload_t* p, uint32_t* out_len);
+NUM8LORA_OP_API int num8lora_op_encode_beacon(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t seq, const num8lora_op_beacon_payload_t* p, uint32_t* out_len);
+NUM8LORA_OP_API int num8lora_op_encode_request(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_request_payload_t* p, uint32_t* out_len);
+NUM8LORA_OP_API int num8lora_op_encode_data(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_data_payload_t* p, uint32_t* out_len);
+NUM8LORA_OP_API int num8lora_op_encode_ack(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_ack_payload_t* p, uint32_t* out_len);
+NUM8LORA_OP_API int num8lora_op_encode_nack(uint8_t* out_buf, uint32_t out_cap, uint16_t sender_id, uint16_t receiver_id, uint16_t seq, const num8lora_op_nack_payload_t* p, uint32_t* out_len);
 
-int num8lora_op_decode_common_header(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr);
-int num8lora_op_validate_frame_crc(const uint8_t* buf, uint32_t len);
+NUM8LORA_OP_API int num8lora_op_decode_common_header(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr);
+NUM8LORA_OP_API int num8lora_op_validate_frame_crc(const uint8_t* buf, uint32_t len);
 
-int num8lora_op_decode_beacon(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_beacon_payload_t* out_p);
-int num8lora_op_decode_request(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_request_payload_t* out_p);
-int num8lora_op_decode_data(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_data_payload_t* out_p);
-int num8lora_op_decode_ack(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_ack_payload_t* out_p);
-int num8lora_op_decode_nack(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_nack_payload_t* out_p);
+NUM8LORA_OP_API int num8lora_op_decode_beacon(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_beacon_payload_t* out_p);
+NUM8LORA_OP_API int num8lora_op_decode_request(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_request_payload_t* out_p);
+NUM8LORA_OP_API int num8lora_op_decode_data(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_data_payload_t* out_p);
+NUM8LORA_OP_API int num8lora_op_decode_ack(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_ack_payload_t* out_p);
+NUM8LORA_OP_API int num8lora_op_decode_nack(const uint8_t* buf, uint32_t len, num8lora_op_common_header_t* out_hdr, num8lora_op_nack_payload_t* out_p);
 
 #ifdef __cplusplus
 }
