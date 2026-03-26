@@ -4,8 +4,16 @@ NUM8-LUP is a compact C project for propagating small NUM8 dataset updates over 
 
 The project currently exposes two protocol models:
 
-- a legacy batch-compatible API in `num8lora.*`
+- a legacy batch-compatible API
 - a newer async split model with dedicated sender and receiver libraries
+
+## Repository layout
+
+- `include/` public headers
+- `src/` implementations
+- `tests/` verification targets
+- `examples/` sample integration
+- `docs/` protocol and publishing references
 
 ## What the async split model gives you
 

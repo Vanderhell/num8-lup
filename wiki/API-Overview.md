@@ -2,7 +2,7 @@
 
 ## Async sender API
 
-Header: `num8lora_sender.h`
+Header: `include/num8lora_sender.h`
 
 Key functions:
 
@@ -18,7 +18,7 @@ Key functions:
 
 ## Async receiver API
 
-Header: `num8lora_receiver.h`
+Header: `include/num8lora_receiver.h`
 
 Key functions:
 
@@ -34,6 +34,6 @@ NUM8 helper:
 
 ## Legacy API
 
-Header: `num8lora.h`
+Header: `include/num8lora.h`
 
 The legacy API keeps the original batch-oriented runtime and low-level frame helpers for systems that still depend on the earlier flow.

@@ -2,40 +2,86 @@
 
 Low-bandwidth NUM8 update propagation in C, built for small delta streams and unreliable links.
 
-NUM8-LUP provides a compact transport-friendly update layer for propagating small dataset changes over LoRa-style or similarly constrained links. The repository includes both a legacy batch-compatible library and a newer async sender/receiver split model optimized for infrequent updates and per-receiver catch-up.
+NUM8-LUP is a compact C project for propagating small NUM8 dataset changes over LoRa-style or similarly constrained transports. The repository exposes both a legacy batch-compatible library and a newer async sender/receiver split protocol for deployments that need cleaner per-receiver progress tracking.
 
 ## Project Scope
 
 The project currently ships two protocol lines:
 
-1. Legacy batch API in `num8lora.*`, kept for compatibility with the original specification and existing integrations.
-2. Async split API built around single-operation delivery, explicit sender/receiver roles, and independent receiver progress tracking.
+1. Legacy batch API for compatibility with the original update flow.
+2. Async split API for single-operation delivery, retransmissions, and receiver catch-up.
 
 For new deployments, the async split model is the recommended default.
 
-## Main Outputs
+## Repository Layout
 
-Shared libraries built in Release mode:
+```text
+.
+|-- include/   public headers
+|-- src/       library implementations
+|-- tests/     verification targets
+|-- examples/  sample usage
+|-- docs/      protocol and publishing references
+|-- wiki/      prepared GitHub wiki pages
+|-- CMakeLists.txt
+`-- README.md
+```
+
+This layout keeps the public API, implementation, tests, and documentation clearly separated.
+
+## Public API Surface
+
+Main headers:
+
+- `include/num8lora.h`
+- `include/num8lora_op.h`
+- `include/num8lora_sender.h`
+- `include/num8lora_receiver.h`
+
+Release outputs:
 
 - `num8lora.dll`
 - `num8lora_sender.dll`
 - `num8lora_receiver.dll`
 
-Main public headers:
+### Legacy Batch API
 
-- `num8lora.h`
-- `num8lora_op.h`
-- `num8lora_sender.h`
-- `num8lora_receiver.h`
+The legacy library is declared in `include/num8lora.h` and implemented in:
+
+- `src/num8lora.c`
+- `src/num8lora_runtime.c`
+- `src/num8lora_meta.c`
+- `src/num8lora_num8_bridge.c`
+
+It provides:
+
+- low-level frame encoding and decoding helpers
+- sender and receiver runtime state machines
+- receiver metadata persistence
+- optional NUM8 bridge integration
+
+### Async Split API
+
+The async split model is declared in:
+
+- `include/num8lora_op.h`
+- `include/num8lora_sender.h`
+- `include/num8lora_receiver.h`
+
+Implementation mapping:
+
+- `src/num8lora_op.c` handles frame encoding, decoding, and CRC validation
+- `src/num8lora_sender.c` manages the sender queue, per-receiver state, and retransmissions
+- `src/num8lora_receiver.c` handles beacon processing, operation apply flow, and ACK/NACK generation
 
 ## Async Split Model
 
-The modern sender/receiver flow is designed for small, infrequent changes where reliable delivery matters more than throughput.
+The async sender/receiver flow is designed for small, infrequent changes where delivery reliability matters more than throughput.
 
 Sender side:
 
 - tracks each receiver independently
-- enqueues `ADD` and `REMOVE` operations as a monotonic log
+- stores `ADD` and `REMOVE` operations in a monotonic log
 - emits `BEACON` frames and schedules `DATA` retransmissions
 - consumes inbound `REQUEST`, `ACK`, and `NACK` frames
 
@@ -43,8 +89,8 @@ Receiver side:
 
 - requests only the next missing operation
 - applies one operation per `DATA` frame
-- persists receiver metadata across restarts
-- can apply updates into a NUM8 engine through a callback helper
+- persists metadata across restarts
+- can apply changes into a NUM8 engine through a callback helper
 
 Protocol messages:
 
@@ -71,28 +117,6 @@ The repository includes an end-to-end async example:
 - source: `examples/async_demo.c`
 - target: `num8lora_async_demo`
 
-## Documentation Map
-
-Public docs:
-
-- `docs/QUICKSTART.md`
-- `docs/SENDER_API.md`
-- `docs/RECEIVER_API.md`
-- `docs/WIRE_FORMAT.md`
-- `docs/DEPLOYMENT_CHECKLIST.md`
-
-Protocol/API reference:
-
-- `NUM8LORA_ASYNC_SPLIT_API.md`
-- `NUM8LORA_DLL_API.md`
-- `Specification..md`
-
-GitHub publishing assets:
-
-- `docs/GITHUB_METADATA.md`
-- `docs/PUBLISHING_CHECKLIST.md`
-- `wiki/`
-
 ## Tests
 
 Core test targets:
@@ -102,10 +126,37 @@ Core test targets:
 - `num8lora_op_test`
 - `num8lora_async_test`
 
-Optional NUM8-dependent targets are enabled only when `../NUM8-DENSE` is available during CMake configure.
+Additional NUM8-dependent tests:
+
+- `tests/num8lora_num8_test.c`
+- `tests/num8lora_flow_num8_test.c`
+
+Optional NUM8 targets are enabled only when `../NUM8-DENSE` is available during CMake configure.
+
+## Documentation Map
+
+Primary docs:
+
+- `docs/QUICKSTART.md`
+- `docs/SENDER_API.md`
+- `docs/RECEIVER_API.md`
+- `docs/WIRE_FORMAT.md`
+- `docs/DEPLOYMENT_CHECKLIST.md`
+
+Long-form technical reference:
+
+- `docs/ASYNC_SPLIT_API.md`
+- `docs/LEGACY_DLL_API.md`
+- `docs/SPECIFICATION.md`
+
+GitHub publishing assets:
+
+- `docs/GITHUB_METADATA.md`
+- `docs/PUBLISHING_CHECKLIST.md`
+- `wiki/`
 
 ## Repository Notes
 
 - The project uses C99 and CMake.
 - Shared libraries are configured with `WINDOWS_EXPORT_ALL_SYMBOLS ON`.
-- The repository should get a `LICENSE` file before being made public.
+- Add a `LICENSE` file before making the repository public.

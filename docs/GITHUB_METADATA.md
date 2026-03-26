@@ -42,15 +42,15 @@ Low-bandwidth NUM8 update propagation in C, built for small delta streams and un
 - `num8lora.dll`
 - `num8lora.lib`
 - public headers:
-  - `num8lora.h`
-  - `num8lora_op.h`
-  - `num8lora_sender.h`
-  - `num8lora_receiver.h`
+  - `include/num8lora.h`
+  - `include/num8lora_op.h`
+  - `include/num8lora_sender.h`
+  - `include/num8lora_receiver.h`
 
 ## Repository settings to review before publishing
 
 - Set repository description and topics from this file.
 - Enable GitHub Wiki if you want the prepared wiki pages published.
 - Add a license file before making the repository public.
-- Decide whether legacy API should be marked as stable, deprecated, or compatibility-only in the first public release.
+- Decide whether the legacy API is stable, deprecated, or compatibility-only for the first public release.
 - Create the first tagged release only after `ctest` passes from a clean build directory.
