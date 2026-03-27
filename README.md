@@ -180,4 +180,6 @@ Release packaging:
 
 - The project uses C99 and CMake.
 - Shared libraries are configured with `WINDOWS_EXPORT_ALL_SYMBOLS ON`.
-- Add a `LICENSE` file before making the repository public.
+
+
+MIT — see [LICENSE](LICENSE).
