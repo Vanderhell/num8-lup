@@ -482,7 +482,7 @@ int num8lora_sender_handle_request(
 {
     num8lora_op_common_header_t hdr = {0};
     num8lora_op_request_payload_t p = {0};
-    num8lora_sender_receiver_slot_t* slot;
+    const num8lora_sender_receiver_slot_t* slot;
     num8lora_op_nack_payload_t nack = {0};
 
     if (out_len != NULL)
