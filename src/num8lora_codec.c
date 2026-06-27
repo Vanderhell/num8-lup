@@ -1,5 +1,7 @@
 #include "num8lora_codec.h"
 
+#include <stddef.h>
+
 uint16_t num8lora_codec_crc16_ccitt_false(const void* data, uint32_t len)
 {
     const uint8_t* p = (const uint8_t*)data;

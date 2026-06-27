@@ -1,6 +1,7 @@
 #include "num8lora_metadata.h"
 #include "num8lora_codec.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #define NUM8LORA_METADATA_MAGIC0 'N'

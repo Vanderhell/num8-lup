@@ -123,31 +123,6 @@ static void sender_reclaim_history(num8lora_sender_t* s)
     }
 }
 
-static int request_is_within_sender_history(const num8lora_sender_t* s, const num8lora_sender_receiver_slot_t* slot, uint32_t next_needed_op_id)
-{
-    if (next_needed_op_id == 0u)
-    {
-        return 0;
-    }
-    if (slot == NULL || !slot->active)
-    {
-        return 0;
-    }
-    if (next_needed_op_id < s->oldest_retained_op_id)
-    {
-        return 0;
-    }
-    if (next_needed_op_id > s->latest_op_id + 1u)
-    {
-        return 0;
-    }
-    if (next_needed_op_id != slot->last_acked_op_id + 1u)
-    {
-        return 0;
-    }
-    return 1;
-}
-
 static int sender_storage_pair_is_valid(const void* buf, uint32_t capacity, size_t elem_size)
 {
     if (capacity == 0u)
@@ -633,7 +608,6 @@ int num8lora_sender_handle_rx(
     uint32_t in_len)
 {
     num8lora_op_common_header_t hdr;
-    num8lora_op_request_payload_t p;
     num8lora_sender_receiver_slot_t* slot;
 
     if (s == NULL || in_buf == NULL || in_len < 2u)

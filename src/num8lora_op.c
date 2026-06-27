@@ -1,6 +1,8 @@
 #include "num8lora_op.h"
 #include "num8lora_codec.h"
 
+#include <stddef.h>
+
 #define NUM8LORA_OP_FRAME_HDR_SIZE 8u
 #define NUM8LORA_OP_FRAME_CRC_SIZE 2u
 #define NUM8LORA_OP_BEACON_PAYLOAD_SIZE 8u
