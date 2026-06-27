@@ -20,12 +20,23 @@ if(NOT install_result EQUAL 0)
     message(FATAL_ERROR "package install failed")
 endif()
 
+set(consumer_configure_args
+    -S "${NUM8LORA_SOURCE_DIR}/tests/package_consumer"
+    -B "${consumer_build}"
+    -DCMAKE_PREFIX_PATH=${install_prefix}
+    -DNUM8LORA_EXPECT_HOSTED_METADATA=${NUM8LORA_EXPECT_HOSTED_METADATA}
+)
+
+if(DEFINED NUM8LORA_CONSUMER_C_FLAGS AND NOT NUM8LORA_CONSUMER_C_FLAGS STREQUAL "")
+    list(APPEND consumer_configure_args "-DCMAKE_C_FLAGS=${NUM8LORA_CONSUMER_C_FLAGS}")
+endif()
+
+if(DEFINED NUM8LORA_CONSUMER_EXE_LINKER_FLAGS AND NOT NUM8LORA_CONSUMER_EXE_LINKER_FLAGS STREQUAL "")
+    list(APPEND consumer_configure_args "-DCMAKE_EXE_LINKER_FLAGS=${NUM8LORA_CONSUMER_EXE_LINKER_FLAGS}")
+endif()
+
 execute_process(
-    COMMAND "${CMAKE_COMMAND}"
-        -S "${NUM8LORA_SOURCE_DIR}/tests/package_consumer"
-        -B "${consumer_build}"
-        -DCMAKE_PREFIX_PATH=${install_prefix}
-        -DNUM8LORA_EXPECT_HOSTED_METADATA=${NUM8LORA_EXPECT_HOSTED_METADATA}
+    COMMAND "${CMAKE_COMMAND}" ${consumer_configure_args}
     RESULT_VARIABLE configure_result)
 if(NOT configure_result EQUAL 0)
     message(FATAL_ERROR "consumer configure failed")
