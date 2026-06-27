@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(num8_lup VERSION 0.1.0 LANGUAGES C CXX)
 
+if(WIN32 AND NOT DEFINED CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION)
+    set(CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION 10.0.22621.0 CACHE STRING "Windows SDK version" FORCE)
+endif()
+
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 

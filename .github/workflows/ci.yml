@@ -1,0 +1,323 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu-gcc-c99-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: |
+          cmake -S . -B build-gcc-c99 \
+            -DNUM8LORA_C_STANDARD=99 \
+            -DNUM8LORA_BUILD_HOSTED_METADATA=ON \
+            -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF \
+            -DNUM8LORA_BUILD_EXAMPLES=OFF \
+            -DNUM8LORA_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wcast-qual -Wformat=2 -Wundef -Wstrict-aliasing=2 -Wvla" \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wcast-align -Wcast-qual -Wformat=2 -Wundef"
+      - name: Build
+        run: cmake --build build-gcc-c99 --config Release
+      - name: Test
+        run: ctest --test-dir build-gcc-c99 -C Release --output-on-failure
+
+  ubuntu-gcc-c11-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: |
+          cmake -S . -B build-gcc-c11 \
+            -DNUM8LORA_C_STANDARD=11 \
+            -DNUM8LORA_BUILD_HOSTED_METADATA=ON \
+            -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF \
+            -DNUM8LORA_BUILD_EXAMPLES=OFF \
+            -DNUM8LORA_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wcast-qual -Wformat=2 -Wundef -Wstrict-aliasing=2 -Wvla" \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wcast-align -Wcast-qual -Wformat=2 -Wundef"
+      - name: Build
+        run: cmake --build build-gcc-c11 --config Release
+      - name: Test
+        run: ctest --test-dir build-gcc-c11 -C Release --output-on-failure
+
+  ubuntu-clang-c99-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build-clang-c99 \
+            -DNUM8LORA_C_STANDARD=99 \
+            -DNUM8LORA_BUILD_HOSTED_METADATA=ON \
+            -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF \
+            -DNUM8LORA_BUILD_EXAMPLES=OFF \
+            -DNUM8LORA_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wcast-qual -Wformat=2 -Wundef -Wstrict-aliasing=2 -Wvla" \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wcast-align -Wcast-qual -Wformat=2 -Wundef"
+      - name: Build
+        run: cmake --build build-clang-c99 --config Release
+      - name: Test
+        run: ctest --test-dir build-clang-c99 -C Release --output-on-failure
+
+  ubuntu-clang-c11-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build-clang-c11 \
+            -DNUM8LORA_C_STANDARD=11 \
+            -DNUM8LORA_BUILD_HOSTED_METADATA=ON \
+            -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF \
+            -DNUM8LORA_BUILD_EXAMPLES=OFF \
+            -DNUM8LORA_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wcast-qual -Wformat=2 -Wundef -Wstrict-aliasing=2 -Wvla" \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wcast-align -Wcast-qual -Wformat=2 -Wundef"
+      - name: Build
+        run: cmake --build build-clang-c11 --config Release
+      - name: Test
+        run: ctest --test-dir build-clang-c11 -C Release --output-on-failure
+
+  windows-msvc-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Configure
+        run: cmake -S . -B build-msvc -A x64 -DCMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION=10.0.22621.0 -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_TESTS=ON -DNUM8LORA_BUILD_HOSTED_METADATA=ON -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF -DNUM8LORA_C_STANDARD=99
+      - name: Build
+        run: cmake --build build-msvc --config Release
+      - name: Test
+        run: ctest --test-dir build-msvc -C Release --output-on-failure
+
+  ubuntu-hosted-metadata-on:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build-metadata-on -DNUM8LORA_C_STANDARD=99 -DNUM8LORA_BUILD_HOSTED_METADATA=ON -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build-metadata-on --config Release
+      - name: Test
+        run: ctest --test-dir build-metadata-on -C Release --output-on-failure
+
+  ubuntu-hosted-metadata-off:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build-metadata-off -DNUM8LORA_C_STANDARD=99 -DNUM8LORA_BUILD_HOSTED_METADATA=OFF -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build-metadata-off --config Release
+      - name: Test
+        run: ctest --test-dir build-metadata-off -C Release --output-on-failure
+
+  ubuntu-package-install-consumer:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        hosted_metadata: [ON, OFF]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure package build
+        run: >
+          cmake -S . -B build-package-${{ matrix.hosted_metadata }}
+          -DCMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION=10.0.22621.0
+          -DNUM8LORA_C_STANDARD=99
+          -DNUM8LORA_BUILD_HOSTED_METADATA=${{ matrix.hosted_metadata }}
+          -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF
+          -DNUM8LORA_BUILD_EXAMPLES=OFF
+          -DNUM8LORA_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build package
+        run: cmake --build build-package-${{ matrix.hosted_metadata }} --config Release
+      - name: Install package
+        run: cmake --install build-package-${{ matrix.hosted_metadata }} --config Release --prefix "${{ github.workspace }}/install-${{ matrix.hosted_metadata }}"
+      - name: Configure external consumer
+        env:
+          EXPECT_HOSTED_METADATA: ${{ matrix.hosted_metadata }}
+        run: >
+          cmake -S tests/package_consumer -B consumer-${{ matrix.hosted_metadata }}
+          -DCMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION=10.0.22621.0
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install-${{ matrix.hosted_metadata }}"
+          -DNUM8LORA_EXPECT_HOSTED_METADATA=${{ env.EXPECT_HOSTED_METADATA }}
+          -DNUM8LORA_C_STANDARD=99
+      - name: Build consumer
+        run: cmake --build consumer-${{ matrix.hosted_metadata }} --config Release
+      - name: Run consumer
+        run: |
+          ./consumer-${{ matrix.hosted_metadata }}/package_consumer_legacy
+          ./consumer-${{ matrix.hosted_metadata }}/package_consumer_async
+          if [ "${{ matrix.hosted_metadata }}" = "ON" ]; then
+            ./consumer-${{ matrix.hosted_metadata }}/package_consumer_metadata
+          fi
+
+  ubuntu-num8-adapter-missing-dependency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify adapter configure failure
+        run: |
+          set +e
+          cmake -S . -B build-num8-missing -DCMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION=10.0.22621.0 -DNUM8LORA_BUILD_NUM8_ADAPTER=ON -DNUM8LORA_NUM8_ROOT="${{ github.workspace }}/missing-num8" -DNUM8LORA_BUILD_TESTS=OFF -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_HOSTED_METADATA=OFF
+          status=$?
+          set -e
+          if [ $status -eq 0 ]; then
+            echo "adapter configure unexpectedly succeeded"
+            exit 1
+          fi
+
+  ubuntu-header-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build-header-smoke -DNUM8LORA_C_STANDARD=99 -DNUM8LORA_BUILD_HOSTED_METADATA=OFF -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build smoke tests
+        run: cmake --build build-header-smoke --config Release --target num8lora_header_smoke_num8lora num8lora_header_smoke_num8lora_op num8lora_header_smoke_num8lora_metadata num8lora_header_smoke_num8lora_sender num8lora_header_smoke_num8lora_receiver num8lora_header_smoke_repeat num8lora_header_smoke_cpp num8lora_header_smoke_mtu
+      - name: Run smoke tests
+        run: |
+          ctest --test-dir build-header-smoke -C Release --output-on-failure -R 'num8lora_header_smoke_.*'
+
+  ubuntu-asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: >
+          cmake -S . -B build-asan
+          -DNUM8LORA_C_STANDARD=99
+          -DNUM8LORA_BUILD_HOSTED_METADATA=OFF
+          -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF
+          -DNUM8LORA_BUILD_EXAMPLES=OFF
+          -DNUM8LORA_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS='-fsanitize=address -fno-omit-frame-pointer'
+          -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address'
+      - name: Build
+        run: cmake --build build-asan --config Release
+      - name: Test
+        run: ctest --test-dir build-asan -C Release --output-on-failure
+
+  ubuntu-ubsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: >
+          cmake -S . -B build-ubsan
+          -DNUM8LORA_C_STANDARD=99
+          -DNUM8LORA_BUILD_HOSTED_METADATA=OFF
+          -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF
+          -DNUM8LORA_BUILD_EXAMPLES=OFF
+          -DNUM8LORA_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS='-fsanitize=undefined -fno-omit-frame-pointer'
+          -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=undefined'
+      - name: Build
+        run: cmake --build build-ubsan --config Release
+      - name: Test
+        run: ctest --test-dir build-ubsan -C Release --output-on-failure
+
+  ubuntu-lsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: >
+          cmake -S . -B build-lsan
+          -DNUM8LORA_C_STANDARD=99
+          -DNUM8LORA_BUILD_HOSTED_METADATA=OFF
+          -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF
+          -DNUM8LORA_BUILD_EXAMPLES=OFF
+          -DNUM8LORA_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS='-fsanitize=leak -fno-omit-frame-pointer'
+          -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=leak'
+      - name: Build
+        run: cmake --build build-lsan --config Release
+      - name: Test
+        run: ctest --test-dir build-lsan -C Release --output-on-failure
+
+  ubuntu-cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - name: Run cppcheck
+        run: cppcheck --enable=warning,style,performance,portability --error-exitcode=1 -I include src
+
+  ubuntu-clang-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Analyze
+        run: |
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_codec.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_op.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_metadata.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_meta.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_sender.c
+          clang --analyze -Iinclude -Isrc -std=c99 src/num8lora_receiver.c
+
+  ubuntu-clang-tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-tidy
+        run: sudo apt-get update && sudo apt-get install -y clang-tidy
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: cmake -S . -B build-clang-tidy -DNUM8LORA_C_STANDARD=99 -DNUM8LORA_BUILD_TESTS=OFF -DNUM8LORA_BUILD_EXAMPLES=OFF -DNUM8LORA_BUILD_HOSTED_METADATA=OFF -DNUM8LORA_BUILD_NUM8_ADAPTER=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Run clang-tidy
+        run: |
+          clang-tidy src/num8lora_codec.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
+          clang-tidy src/num8lora_op.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
+          clang-tidy src/num8lora.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
+          clang-tidy src/num8lora_metadata.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
+          clang-tidy src/num8lora_sender.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
+          clang-tidy src/num8lora_receiver.c -p build-clang-tidy --checks=clang-analyzer-* --warnings-as-errors='*'
