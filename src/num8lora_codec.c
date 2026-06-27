@@ -22,11 +22,11 @@ uint16_t num8lora_codec_crc16_ccitt_false(const void* data, uint32_t len)
         {
             if ((crc & 0x8000u) != 0u)
             {
-                crc = (uint16_t)((crc << 1) ^ 0x1021u);
+                crc = (uint16_t)(((uint32_t)crc << 1) ^ 0x1021u);
             }
             else
             {
-                crc = (uint16_t)(crc << 1);
+                crc = (uint16_t)((uint32_t)crc << 1);
             }
         }
     }

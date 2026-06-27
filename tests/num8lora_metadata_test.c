@@ -22,6 +22,20 @@ static int record_equal(const num8lora_metadata_record_t* a, const num8lora_meta
         && a->reserved0 == b->reserved0;
 }
 
+static FILE* open_file_write(const char* path)
+{
+    FILE* f = NULL;
+#if defined(_WIN32)
+    if (fopen_s(&f, path, "wb") != 0)
+    {
+        f = NULL;
+    }
+#else
+    f = fopen(path, "wb");
+#endif
+    return f;
+}
+
 static int test_record_codec(void)
 {
     num8lora_metadata_record_t rec = { NUM8LORA_METADATA_FORMAT_VERSION, 77u, 12u, 34u, 0u };
@@ -100,7 +114,7 @@ static int test_file_io(void)
 
     CHECK(num8lora_metadata_encode_record(&rec, buf, sizeof(buf), &len, &err));
 
-    f = fopen(trailing_path, "wb");
+    f = open_file_write(trailing_path);
     CHECK(f != NULL);
     CHECK(fwrite(buf, 1u, len, f) == len);
     ch = fputc('X', f);
@@ -109,7 +123,7 @@ static int test_file_io(void)
     CHECK(!num8lora_metadata_load_file(trailing_path, &out, &err));
     CHECK(err == NUM8LORA_METADATA_ERR_LENGTH);
 
-    f = fopen(truncated_path, "wb");
+    f = open_file_write(truncated_path);
     CHECK(f != NULL);
     CHECK(fwrite(buf, 1u, len - 1u, f) == len - 1u);
     CHECK(fclose(f) == 0);

@@ -41,11 +41,11 @@ static uint16_t crc16_update_byte(uint16_t crc, uint8_t byte)
     {
         if ((crc & 0x8000u) != 0u)
         {
-            crc = (uint16_t)((crc << 1) ^ 0x1021u);
+            crc = (uint16_t)(((uint32_t)crc << 1) ^ 0x1021u);
         }
         else
         {
-            crc = (uint16_t)(crc << 1);
+            crc = (uint16_t)((uint32_t)crc << 1);
         }
     }
     return crc;
