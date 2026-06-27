@@ -27,6 +27,10 @@ int num8lora_receiver_handle_beacon(
     num8lora_op_beacon_payload_t b;
     num8lora_op_request_payload_t req;
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (r == NULL || in_buf == NULL || out_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -68,12 +72,21 @@ int num8lora_receiver_handle_data(
     num8lora_op_ack_payload_t ack;
     num8lora_op_nack_payload_t nack;
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (r == NULL || in_buf == NULL || out_buf == NULL || out_len == NULL)
     {
         return 0;
     }
 
     if (!num8lora_op_decode_data(in_buf, in_len, &hdr, &d))
+    {
+        return 0;
+    }
+
+    if (hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != r->receiver_id)
     {
         return 0;
     }
@@ -85,10 +98,6 @@ int num8lora_receiver_handle_data(
         nack.detail = 0u;
         nack.expected_next_op_id = r->last_applied_op_id + 1u;
         return num8lora_op_encode_nack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &nack, out_len);
-    }
-    if (hdr.receiver_id != r->receiver_id)
-    {
-        return 0;
     }
     if (d.stream_id != r->stream_id)
     {

@@ -26,6 +26,23 @@ static const num8lora_sender_op_t* find_op(const num8lora_sender_t* s, uint32_t 
     return &s->ops[op_id - 1u];
 }
 
+static int request_is_within_sender_history(const num8lora_sender_t* s, const num8lora_sender_receiver_slot_t* slot, uint32_t next_needed_op_id)
+{
+    if (next_needed_op_id == 0u)
+    {
+        return 0;
+    }
+    if (slot == NULL || !slot->active)
+    {
+        return 0;
+    }
+    if (next_needed_op_id != slot->last_acked_op_id + 1u)
+    {
+        return 0;
+    }
+    return next_needed_op_id <= s->latest_op_id + 1u;
+}
+
 static int emit_data(num8lora_sender_t* s, num8lora_sender_receiver_slot_t* slot, uint32_t op_id, uint8_t* out_buf, uint32_t out_cap, uint32_t* out_len)
 {
     const num8lora_sender_op_t* op = find_op(s, op_id);
@@ -240,6 +257,14 @@ int num8lora_sender_poll_tx(
 {
     uint32_t i;
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
+    if (out_target_receiver_id != NULL)
+    {
+        *out_target_receiver_id = 0u;
+    }
     if (s == NULL || out_buf == NULL || out_len == NULL || out_target_receiver_id == NULL)
     {
         return 0;
@@ -303,91 +328,87 @@ int num8lora_sender_handle_rx(
     const uint8_t* in_buf,
     uint32_t in_len)
 {
-    num8lora_op_common_header_t hdr;
-
-    if (s == NULL || in_buf == NULL)
-    {
-        return 0;
-    }
-    if (!num8lora_op_decode_common_header(in_buf, in_len, &hdr))
+    if (s == NULL || in_buf == NULL || in_len < 2u)
     {
         return 0;
     }
 
-    if (hdr.msg_type == NUM8LORA_OP_MSG_REQUEST)
+    if (in_buf[1] == NUM8LORA_OP_MSG_REQUEST)
     {
+        num8lora_op_common_header_t hdr;
         num8lora_op_request_payload_t p;
         num8lora_sender_receiver_slot_t* slot;
         if (!num8lora_op_decode_request(in_buf, in_len, &hdr, &p))
         {
             return 0;
         }
+        slot = find_slot(s, hdr.sender_id);
+        if (hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id || slot == NULL)
+        {
+            return 0;
+        }
         if (p.stream_id != s->stream_id)
         {
             return 0;
         }
-        if (!num8lora_sender_register_receiver(s, hdr.sender_id, p.next_needed_op_id == 0u ? 0u : p.next_needed_op_id - 1u))
+        if (!request_is_within_sender_history(s, slot, p.next_needed_op_id))
         {
             return 0;
         }
-        slot = find_slot(s, hdr.sender_id);
-        if (slot == NULL)
+        if (slot->waiting_ack && slot->inflight_op_id != p.next_needed_op_id)
         {
             return 0;
         }
-        slot->last_acked_op_id = p.next_needed_op_id == 0u ? 0u : p.next_needed_op_id - 1u;
-        slot->waiting_ack = 0u;
         slot->due_at_ms = now_ms;
         return 1;
     }
 
-    if (hdr.msg_type == NUM8LORA_OP_MSG_ACK)
+    if (in_buf[1] == NUM8LORA_OP_MSG_ACK)
     {
+        num8lora_op_common_header_t hdr;
         num8lora_op_ack_payload_t p;
         num8lora_sender_receiver_slot_t* slot;
         if (!num8lora_op_decode_ack(in_buf, in_len, &hdr, &p))
         {
             return 0;
         }
-        if (p.stream_id != s->stream_id)
-        {
-            return 0;
-        }
         slot = find_slot(s, hdr.sender_id);
-        if (slot == NULL)
+        if (hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id || slot == NULL)
         {
             return 0;
         }
-        if (p.ack_op_id > slot->last_acked_op_id)
+        if (p.stream_id != s->stream_id || !slot->waiting_ack || slot->inflight_op_id == 0u || p.ack_op_id != slot->inflight_op_id)
         {
-            slot->last_acked_op_id = p.ack_op_id;
+            return 0;
         }
+        slot->last_acked_op_id = p.ack_op_id;
         slot->waiting_ack = 0u;
         slot->inflight_op_id = 0u;
         slot->retries = 0u;
         return 1;
     }
 
-    if (hdr.msg_type == NUM8LORA_OP_MSG_NACK)
+    if (in_buf[1] == NUM8LORA_OP_MSG_NACK)
     {
+        num8lora_op_common_header_t hdr;
         num8lora_op_nack_payload_t p;
         num8lora_sender_receiver_slot_t* slot;
         if (!num8lora_op_decode_nack(in_buf, in_len, &hdr, &p))
         {
             return 0;
         }
-        if (p.stream_id != s->stream_id)
-        {
-            return 0;
-        }
         slot = find_slot(s, hdr.sender_id);
-        if (slot == NULL)
+        if (hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id || slot == NULL)
         {
             return 0;
         }
-        if (p.expected_next_op_id > 0u)
+        if (p.stream_id != s->stream_id || !slot->waiting_ack || slot->inflight_op_id == 0u)
         {
-            slot->last_acked_op_id = p.expected_next_op_id - 1u;
+            return 0;
+        }
+        if (p.expected_next_op_id != slot->inflight_op_id)
+        {
+            return 0;
         }
         slot->waiting_ack = 0u;
         slot->inflight_op_id = 0u;

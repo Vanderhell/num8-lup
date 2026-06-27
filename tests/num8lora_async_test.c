@@ -17,8 +17,127 @@ static int apply_fn(void* u, uint8_t op_type, uint32_t value)
     return 1;
 }
 
+static int test_sender_routing_gates(void)
+{
+    num8lora_sender_t snd;
+    num8lora_sender_op_t ops[8];
+    num8lora_sender_receiver_slot_t slots[4];
+    uint8_t out[128];
+    uint32_t out_len = 0;
+    uint16_t target = 0;
+    uint32_t sent_len = 0;
+    uint32_t now = 0;
+    num8lora_op_request_payload_t req;
+
+    num8lora_sender_init(&snd, 10u, 1001u, 50u, 3u, ops, 8u, slots, 4u);
+    C(num8lora_sender_register_receiver(&snd, 21u, 0u));
+    C(num8lora_sender_register_receiver(&snd, 22u, 0u));
+    C(num8lora_sender_enqueue_add(&snd, 5u, NULL));
+    C(num8lora_sender_enqueue_add(&snd, 6u, NULL));
+
+    C(num8lora_sender_poll_tx(&snd, now, out, sizeof(out), &sent_len, &target));
+    C(target == 21u);
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    req.stream_id = snd.stream_id;
+    req.next_needed_op_id = 1u;
+    C(num8lora_op_encode_request(out, sizeof(out), 21u, 99u, 1u, &req, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u && slots[0].last_acked_op_id == 0u);
+
+    C(num8lora_op_encode_request(out, sizeof(out), 0u, 10u, 1u, &req, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    C(num8lora_op_encode_ack(out, sizeof(out), 77u, 10u, 1u, &(num8lora_op_ack_payload_t){ snd.stream_id, 1u }, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    C(num8lora_op_encode_nack(out, sizeof(out), 77u, 10u, 1u, &(num8lora_op_nack_payload_t){ snd.stream_id, NUM8LORA_OP_ERR_STREAM, 0u, 1u }, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    req.stream_id = snd.stream_id;
+    req.next_needed_op_id = 99u;
+    C(num8lora_op_encode_request(out, sizeof(out), 21u, 10u, 2u, &req, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    C(num8lora_op_encode_ack(out, sizeof(out), 21u, 10u, 2u, &(num8lora_op_ack_payload_t){ snd.stream_id, 99u }, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    C(num8lora_op_encode_nack(out, sizeof(out), 21u, 10u, 2u, &(num8lora_op_nack_payload_t){ snd.stream_id, NUM8LORA_OP_ERR_SEQUENCE_GAP, 0u, 99u }, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    req.stream_id = snd.stream_id;
+    req.next_needed_op_id = 1u;
+    C(num8lora_op_encode_request(out, sizeof(out), 21u, 10u, 3u, &req, &out_len));
+    C(num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
+
+    C(num8lora_op_encode_ack(out, sizeof(out), 21u, 10u, 4u, &(num8lora_op_ack_payload_t){ snd.stream_id, 1u }, &out_len));
+    C(num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 0u && slots[0].inflight_op_id == 0u && slots[0].last_acked_op_id == 1u);
+
+    C(num8lora_sender_poll_tx(&snd, now, out, sizeof(out), &sent_len, &target));
+    C(target == 21u);
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 2u);
+
+    C(num8lora_op_encode_ack(out, sizeof(out), 21u, 10u, 5u, &(num8lora_op_ack_payload_t){ snd.stream_id, 1u }, &out_len));
+    C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 2u && slots[0].last_acked_op_id == 1u);
+
+    C(num8lora_op_encode_ack(out, sizeof(out), 21u, 10u, 6u, &(num8lora_op_ack_payload_t){ snd.stream_id, 2u }, &out_len));
+    C(num8lora_sender_handle_rx(&snd, now, out, out_len));
+    C(slots[0].waiting_ack == 0u && slots[0].inflight_op_id == 0u && slots[0].last_acked_op_id == 2u);
+
+    return 0;
+}
+
+static int test_receiver_routing_gates(void)
+{
+    num8lora_receiver_t rx;
+    state_t s = {0};
+    uint8_t out[128];
+    uint32_t out_len = 777u;
+    num8lora_op_data_payload_t d;
+
+    num8lora_receiver_init(&rx, 21u, 10u, 1001u, 0u);
+
+    d.stream_id = rx.stream_id;
+    d.op_id = 1u;
+    d.op_type = NUM8LORA_OP_ADD;
+    d.reserved0 = 0u;
+    d.reserved1 = 0u;
+    d.value = 5u;
+
+    C(num8lora_op_encode_data(out, sizeof(out), 10u, 22u, 1u, &d, &out_len));
+    out_len = 777u;
+    C(!num8lora_receiver_handle_data(&rx, out, out_len, apply_fn, &s, out, sizeof(out), &out_len));
+    C(out_len == 0u);
+    C(rx.last_applied_op_id == 0u && s.present[5] == 0);
+
+    C(num8lora_op_encode_data(out, sizeof(out), 10u, 21u, 1u, &d, &out_len));
+    out_len = 777u;
+    d.stream_id = 9999u;
+    C(!num8lora_receiver_handle_data(&rx, out, out_len, apply_fn, &s, out, sizeof(out), &out_len));
+    C(out_len == 0u);
+    C(rx.last_applied_op_id == 0u && s.present[5] == 0);
+
+    out_len = 123u;
+    C(!num8lora_receiver_handle_data(&rx, out, 0u, apply_fn, &s, out, sizeof(out), &out_len));
+    C(out_len == 0u);
+
+    return 0;
+}
+
 int main(void)
 {
+    C(test_sender_routing_gates() == 0);
+    C(test_receiver_routing_gates() == 0);
+
     num8lora_sender_t snd;
     num8lora_sender_op_t ops[64];
     num8lora_sender_receiver_slot_t slots[8];
