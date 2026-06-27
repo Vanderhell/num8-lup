@@ -1,6 +1,8 @@
 #include "num8lora.h"
 #include "num8lora_codec.h"
 
+#include <stddef.h>
+
 static uint32_t update_payload_size(uint8_t remove_count, uint8_t add_count)
 {
     return 16u + 4u * (uint32_t)remove_count + 4u * (uint32_t)add_count;
