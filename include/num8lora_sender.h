@@ -24,6 +24,7 @@ typedef struct num8lora_sender_receiver_slot_s
     uint8_t waiting_ack;
     uint8_t retries;
     uint8_t active;
+    uint8_t exhausted;
 } num8lora_sender_receiver_slot_t;
 
 typedef struct num8lora_sender_s
@@ -32,6 +33,9 @@ typedef struct num8lora_sender_s
     uint16_t seq;
     uint32_t stream_id;
     uint32_t latest_op_id;
+    uint32_t oldest_retained_op_id;
+    uint32_t op_head;
+    uint32_t poll_cursor;
 
     uint32_t ack_timeout_ms;
     uint8_t max_retries;
@@ -57,6 +61,7 @@ NUM8LORA_OP_API void num8lora_sender_init(
 
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_register_receiver(num8lora_sender_t* s, uint16_t receiver_id, uint32_t last_acked_op_id);
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_set_receiver_progress(num8lora_sender_t* s, uint16_t receiver_id, uint32_t last_acked_op_id);
+NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_unregister_receiver(num8lora_sender_t* s, uint16_t receiver_id);
 
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_enqueue_add(num8lora_sender_t* s, uint32_t value, uint32_t* out_op_id);
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_enqueue_remove(num8lora_sender_t* s, uint32_t value, uint32_t* out_op_id);
@@ -70,6 +75,13 @@ NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_enqueue_lists(
     uint32_t* out_last_op_id);
 
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_build_beacon(const num8lora_sender_t* s, uint8_t* out_buf, uint32_t out_cap, uint32_t* out_len);
+NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_handle_request(
+    num8lora_sender_t* s,
+    const uint8_t* in_buf,
+    uint32_t in_len,
+    uint8_t* out_response_buf,
+    uint32_t out_cap,
+    uint32_t* out_len);
 
 NUM8LORA_OP_API num8lora_op_status_t num8lora_sender_poll_tx(
     num8lora_sender_t* s,

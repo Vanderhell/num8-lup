@@ -40,6 +40,7 @@ typedef int num8lora_op_status_t;
 #define NUM8LORA_OP_ERR_SEQUENCE_GAP         6u
 #define NUM8LORA_OP_ERR_INVALID_VALUE        7u
 #define NUM8LORA_OP_ERR_APPLY_FAILED         8u
+#define NUM8LORA_OP_ERR_HISTORY_UNAVAILABLE  9u
 
 typedef struct num8lora_op_common_header_s
 {
