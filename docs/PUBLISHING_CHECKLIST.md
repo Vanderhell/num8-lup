@@ -37,3 +37,4 @@
 - [ ] include public headers from `include/`
 - [ ] include changelog or release notes for the first public version
 - [ ] prepare Linux source or binary bundle if Linux consumers are expected
+- [ ] confirm tag-based release workflow publishes archive names derived from the tag version

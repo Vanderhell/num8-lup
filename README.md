@@ -147,7 +147,7 @@ Additional NUM8-dependent tests:
 - `tests/num8lora_num8_test.c`
 - `tests/num8lora_flow_num8_test.c`
 
-Optional NUM8 targets are enabled only when `../NUM8-DENSE` is available during CMake configure.
+Optional NUM8 adapter targets are enabled only when `NUM8LORA_BUILD_NUM8_ADAPTER=ON` and `NUM8LORA_NUM8_ROOT` points to a checkout containing `num8.c` and `num8.h`.
 
 ## Documentation Map
 
@@ -173,8 +173,8 @@ GitHub publishing assets:
 
 Release packaging:
 
-- Windows binary bundle: `artifacts/release/num8-lup-v1.0.0-win64.zip`
-- Linux source bundle: `artifacts/release/num8-lup-v1.0.0-linux-src.tar.gz`
+- expected Windows binary bundle: `num8-lup-v<version>-win64.zip`
+- expected Linux source bundle: `num8-lup-v<version>-linux-src.tar.gz`
 
 ## Repository Notes
 

@@ -8,10 +8,12 @@
 
 ## Artifacts
 
+- [ ] `num8lora.lib`
 - [ ] `num8lora_sender.dll`
+- [ ] `num8lora_sender.lib`
 - [ ] `num8lora_receiver.dll`
+- [ ] `num8lora_receiver.lib`
 - [ ] `num8lora.dll` if the legacy compatibility library is part of the release
-- [ ] matching `.lib` files
 - [ ] public headers from `include/`
 
 ## Sender runtime
