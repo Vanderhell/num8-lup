@@ -1,114 +1,180 @@
-#include "num8lora_op.h"
+#include "num8lora_metadata.h"
 
 #include <stdio.h>
 #include <string.h>
 
-static void st16(uint8_t* p, uint16_t v)
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
+static int write_record_file(FILE* f, const uint8_t* buf, uint32_t len)
 {
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8) & 0xFFu);
-}
+    int ok = 0;
 
-static void st32(uint8_t* p, uint32_t v)
-{
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8) & 0xFFu);
-    p[2] = (uint8_t)((v >> 16) & 0xFFu);
-    p[3] = (uint8_t)((v >> 24) & 0xFFu);
-}
-
-static uint16_t ld16(const uint8_t* p)
-{
-    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-}
-
-static uint32_t ld32(const uint8_t* p)
-{
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-int num8lora_save_receiver_meta(const char* path, uint32_t dataset_version, uint32_t last_applied_update_id)
-{
-    uint8_t rec[18];
-    uint16_t crc;
-    FILE* f;
-
-    if (path == NULL)
-    {
-        return 0;
-    }
-
-    rec[0] = 'N';
-    rec[1] = '8';
-    rec[2] = 'L';
-    rec[3] = 'M';
-    st16(&rec[4], 1u);
-    st16(&rec[6], 0u);
-    st32(&rec[8], dataset_version);
-    st32(&rec[12], last_applied_update_id);
-    crc = num8lora_op_crc16_ccitt_false(rec, 16u);
-    st16(&rec[16], crc);
-
-    f = fopen(path, "wb");
     if (f == NULL)
     {
         return 0;
     }
-    if (fwrite(rec, 1, sizeof(rec), f) != sizeof(rec))
+
+    ok = (fwrite(buf, 1u, len, f) == len);
+    if (ok)
     {
-        fclose(f);
-        return 0;
+        ok = (fflush(f) == 0);
     }
-    fclose(f);
-    return 1;
+    if (fclose(f) != 0)
+    {
+        ok = 0;
+    }
+    return ok;
 }
 
-int num8lora_load_receiver_meta(const char* path, uint32_t* out_dataset_version, uint32_t* out_last_applied_update_id)
+static int replace_file_atomically(const char* temp_path, const char* final_path)
 {
-    uint8_t rec[18];
-    uint16_t crc;
-    FILE* f;
+#if defined(_WIN32)
+    return MoveFileExA(temp_path, final_path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+    return rename(temp_path, final_path) == 0;
+#endif
+}
 
-    if (out_dataset_version != NULL)
+num8lora_metadata_status_t num8lora_metadata_save_file(
+    const char* path,
+    const num8lora_metadata_record_t* record,
+    uint16_t* out_error_code)
+{
+    uint8_t buf[26u];
+    uint32_t len = 0u;
+    char temp_path[1024u];
+    FILE* f = NULL;
+
+    if (out_error_code != NULL)
     {
-        *out_dataset_version = 0u;
+        *out_error_code = NUM8LORA_METADATA_ERR_NONE;
     }
-    if (out_last_applied_update_id != NULL)
+    if (path == NULL || record == NULL)
     {
-        *out_last_applied_update_id = 0u;
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_INTERNAL;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
     }
-    if (path == NULL || out_dataset_version == NULL || out_last_applied_update_id == NULL)
+
+    if (!num8lora_metadata_encode_record(record, buf, sizeof(buf), &len, out_error_code))
     {
-        return 0;
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    {
+        int written = snprintf(temp_path, sizeof(temp_path), "%s.tmp", path);
+        if (written < 0 || (size_t)written >= sizeof(temp_path))
+        {
+            if (out_error_code != NULL)
+            {
+                *out_error_code = NUM8LORA_METADATA_ERR_IO;
+            }
+            return NUM8LORA_METADATA_STATUS_FAILURE;
+        }
+    }
+
+    f = fopen(temp_path, "wb");
+    if (f == NULL)
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_IO;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    if (!write_record_file(f, buf, len))
+    {
+        remove(temp_path);
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_IO;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    if (!replace_file_atomically(temp_path, path))
+    {
+        remove(temp_path);
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_IO;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    return NUM8LORA_METADATA_STATUS_SUCCESS;
+}
+
+num8lora_metadata_status_t num8lora_metadata_load_file(
+    const char* path,
+    num8lora_metadata_record_t* out_record,
+    uint16_t* out_error_code)
+{
+    uint8_t buf[26u];
+    FILE* f;
+    long extra;
+
+    if (out_record != NULL)
+    {
+        memset(out_record, 0, sizeof(*out_record));
+    }
+    if (out_error_code != NULL)
+    {
+        *out_error_code = NUM8LORA_METADATA_ERR_NONE;
+    }
+    if (path == NULL || out_record == NULL)
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_INTERNAL;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
     }
 
     f = fopen(path, "rb");
     if (f == NULL)
     {
-        return 0;
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_IO;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
     }
-    if (fread(rec, 1, sizeof(rec), f) != sizeof(rec))
+
+    if (fread(buf, 1u, sizeof(buf), f) != sizeof(buf))
     {
         fclose(f);
-        return 0;
-    }
-    fclose(f);
-
-    if (rec[0] != 'N' || rec[1] != '8' || rec[2] != 'L' || rec[3] != 'M')
-    {
-        return 0;
-    }
-    if (ld16(&rec[4]) != 1u)
-    {
-        return 0;
-    }
-    crc = num8lora_op_crc16_ccitt_false(rec, 16u);
-    if (crc != ld16(&rec[16]))
-    {
-        return 0;
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_LENGTH;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
     }
 
-    *out_dataset_version = ld32(&rec[8]);
-    *out_last_applied_update_id = ld32(&rec[12]);
-    return 1;
+    extra = fgetc(f);
+    if (extra != EOF)
+    {
+        fclose(f);
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_LENGTH;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    if (fclose(f) != 0)
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_METADATA_ERR_IO;
+        }
+        return NUM8LORA_METADATA_STATUS_FAILURE;
+    }
+
+    return num8lora_metadata_decode_record(buf, sizeof(buf), out_record, out_error_code);
 }

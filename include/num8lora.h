@@ -366,9 +366,6 @@ NUM8LORA_API num8lora_status_t num8lora_receiver_encode_nack(
     uint32_t out_cap,
     uint32_t* out_len);
 
-NUM8LORA_API num8lora_status_t num8lora_save_receiver_meta(const char* path, uint32_t dataset_version, uint32_t last_applied_update_id);
-NUM8LORA_API num8lora_status_t num8lora_load_receiver_meta(const char* path, uint32_t* out_dataset_version, uint32_t* out_last_applied_update_id);
-
 #ifdef NUM8LORA_ENABLE_NUM8
 #include "num8.h"
 NUM8LORA_API num8lora_status_t num8lora_apply_update_to_num8(
