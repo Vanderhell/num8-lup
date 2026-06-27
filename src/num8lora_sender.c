@@ -6,7 +6,20 @@
 
 #define MAX_VALUE 99999999u
 
-static num8lora_sender_receiver_slot_t* find_slot(num8lora_sender_t* s, uint16_t rid)
+static num8lora_sender_receiver_slot_t* find_slot_mut(num8lora_sender_t* s, uint16_t rid)
+{
+    uint32_t i;
+    for (i = 0; i < s->receiver_capacity; ++i)
+    {
+        if (s->receivers[i].active && s->receivers[i].receiver_id == rid)
+        {
+            return &s->receivers[i];
+        }
+    }
+    return NULL;
+}
+
+static const num8lora_sender_receiver_slot_t* find_slot_const(const num8lora_sender_t* s, uint16_t rid)
 {
     uint32_t i;
     for (i = 0; i < s->receiver_capacity; ++i)
@@ -224,7 +237,7 @@ int num8lora_sender_register_receiver(num8lora_sender_t* s, uint16_t receiver_id
         return 0;
     }
     sender_reclaim_history(s);
-    if (find_slot(s, receiver_id) != NULL)
+    if (find_slot_const(s, receiver_id) != NULL)
     {
         return 1;
     }
@@ -250,7 +263,7 @@ int num8lora_sender_set_receiver_progress(num8lora_sender_t* s, uint16_t receive
     {
         return 0;
     }
-    slot = find_slot(s, receiver_id);
+    slot = find_slot_mut(s, receiver_id);
     if (slot == NULL)
     {
         return 0;
@@ -272,7 +285,7 @@ int num8lora_sender_unregister_receiver(num8lora_sender_t* s, uint16_t receiver_
     {
         return 0;
     }
-    slot = find_slot(s, receiver_id);
+    slot = find_slot_mut(s, receiver_id);
     if (slot == NULL)
     {
         return 0;
@@ -486,7 +499,7 @@ int num8lora_sender_handle_request(
         return 0;
     }
 
-    slot = find_slot(s, hdr.sender_id);
+    slot = find_slot_const(s, hdr.sender_id);
     if (slot == NULL || !slot->active || hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id)
     {
         return 0;
@@ -622,7 +635,7 @@ int num8lora_sender_handle_rx(
         {
             return 0;
         }
-        slot = find_slot(s, hdr.sender_id);
+        slot = find_slot_mut(s, hdr.sender_id);
         if (slot == NULL || !slot->active || hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id)
         {
             return 0;
@@ -662,7 +675,7 @@ int num8lora_sender_handle_rx(
         {
             return 0;
         }
-        slot = find_slot(s, hdr.sender_id);
+        slot = find_slot_mut(s, hdr.sender_id);
         if (slot == NULL || !slot->active || hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id)
         {
             return 0;
@@ -687,7 +700,7 @@ int num8lora_sender_handle_rx(
         {
             return 0;
         }
-        slot = find_slot(s, hdr.sender_id);
+        slot = find_slot_mut(s, hdr.sender_id);
         if (slot == NULL || !slot->active || hdr.protocol_version != NUM8LORA_OP_PROTOCOL_VERSION || hdr.receiver_id != s->sender_id)
         {
             return 0;
