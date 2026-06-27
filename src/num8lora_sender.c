@@ -245,7 +245,7 @@ int num8lora_sender_register_receiver(num8lora_sender_t* s, uint16_t receiver_id
 
 int num8lora_sender_set_receiver_progress(num8lora_sender_t* s, uint16_t receiver_id, uint32_t last_acked_op_id)
 {
-    num8lora_sender_receiver_slot_t* slot;
+    num8lora_sender_receiver_slot_t* slot; /* cppcheck-suppress constVariablePointer */
     if (s == NULL)
     {
         return 0;
