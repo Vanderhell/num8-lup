@@ -2,9 +2,9 @@
 
 #include <string.h>
 
-static uint32_t load_u32_le(const uint8_t* p)
+static uint32_t update_payload_size(uint8_t remove_count, uint8_t add_count)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    return 16u + 4u * (uint32_t)remove_count + 4u * (uint32_t)add_count;
 }
 
 void num8lora_sender_init(num8lora_sender_ctx_t* ctx, uint16_t sender_id, uint8_t max_retries)
@@ -110,7 +110,23 @@ int num8lora_sender_build_beacon(num8lora_sender_ctx_t* ctx, uint8_t* out_buf, u
     p.update_payload_size = (uint16_t)(16u + 4u * (uint16_t)p.remove_count + 4u * (uint16_t)p.add_count);
     p.update_payload_crc16 = ctx->update_payload_crc16;
 
-    return num8lora_encode_beacon(out_buf, out_cap, ctx->sender_id, ctx->seq++, &p, out_len);
+    if (out_len == NULL || out_buf == NULL)
+    {
+        return 0;
+    }
+    if (out_cap < 28u)
+    {
+        return 0;
+    }
+    {
+        uint16_t seq = ctx->seq;
+        if (!num8lora_encode_beacon(out_buf, out_cap, ctx->sender_id, seq, &p, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+    return 1;
 }
 
 static int sender_emit_update(const num8lora_sender_ctx_t* ctx, uint16_t receiver_id, uint16_t seq, uint8_t* out_response_buf, uint32_t out_cap, uint32_t* out_len)
@@ -138,6 +154,10 @@ int num8lora_sender_handle_update_request(
     num8lora_common_header_t hdr = {0};
     num8lora_update_request_payload_t req;
     uint16_t err = NUM8LORA_ERR_NONE;
+    num8lora_nack_payload_t nack = {0};
+    uint32_t frame_len = 0u;
+    uint16_t seq = 0u;
+    int send_nack = 0;
 
     if (out_len != NULL)
     {
@@ -159,41 +179,62 @@ int num8lora_sender_handle_update_request(
 
     if (!num8lora_decode_update_request(req_buf, req_len, &hdr, &req))
     {
-        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = ctx->update_hdr.update_id;
         nack.error_code = err == NUM8LORA_ERR_NONE ? NUM8LORA_ERR_INTERNAL : err;
         nack.detail = 0u;
         ctx->last_nack_error = nack.error_code;
-        ctx->state = NUM8LORA_SENDER_IDLE;
-        return num8lora_encode_nack(out_response_buf, out_cap, ctx->sender_id, hdr.sender_id, ctx->seq++, &nack, out_len);
+        send_nack = 1;
     }
-
-    if (req.requested_update_id != ctx->update_hdr.update_id)
+    else if (req.requested_update_id != ctx->update_hdr.update_id)
     {
-        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = req.requested_update_id;
         nack.error_code = NUM8LORA_ERR_UPDATE_ID_UNKNOWN;
         nack.detail = 0u;
         ctx->last_nack_error = nack.error_code;
-        ctx->state = NUM8LORA_SENDER_IDLE;
-        return num8lora_encode_nack(out_response_buf, out_cap, ctx->sender_id, hdr.sender_id, ctx->seq++, &nack, out_len);
+        send_nack = 1;
     }
-
-    if (req.receiver_dataset_ver != ctx->update_hdr.dataset_version_from)
+    else if (req.receiver_dataset_ver != ctx->update_hdr.dataset_version_from)
     {
-        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = req.requested_update_id;
         nack.error_code = NUM8LORA_ERR_DATASET_VERSION_MISMATCH;
         nack.detail = 0u;
         ctx->last_nack_error = nack.error_code;
-        ctx->state = NUM8LORA_SENDER_IDLE;
-        return num8lora_encode_nack(out_response_buf, out_cap, ctx->sender_id, hdr.sender_id, ctx->seq++, &nack, out_len);
+        send_nack = 1;
     }
 
+    if (send_nack)
+    {
+        frame_len = 18u;
+        if (out_cap < frame_len)
+        {
+            return 0;
+        }
+        seq = ctx->seq;
+        if (!num8lora_encode_nack(out_response_buf, out_cap, ctx->sender_id, hdr.sender_id, seq, &nack, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+        ctx->state = NUM8LORA_SENDER_IDLE;
+        return 1;
+    }
+
+    frame_len = 26u + 4u * (uint32_t)ctx->update_hdr.remove_count + 4u * (uint32_t)ctx->update_hdr.add_count;
+    if (out_cap < frame_len)
+    {
+        return 0;
+    }
+
+    seq = ctx->seq;
+    if (!sender_emit_update(ctx, hdr.sender_id, seq, out_response_buf, out_cap, out_len))
+    {
+        return 0;
+    }
+    ctx->seq = (uint16_t)(seq + 1u);
     ctx->target_receiver_id = hdr.sender_id;
     ctx->state = NUM8LORA_SENDER_WAIT_ACK;
     ctx->retries = 0u;
-    return sender_emit_update(ctx, hdr.sender_id, ctx->seq++, out_response_buf, out_cap, out_len);
+    return 1;
 }
 
 int num8lora_sender_handle_ack_or_nack(
@@ -291,7 +332,15 @@ int num8lora_sender_on_ack_timeout(
     }
 
     ctx->retries++;
-    return sender_emit_update(ctx, ctx->target_receiver_id, ctx->seq++, out_update_buf, out_cap, out_len);
+    {
+        uint16_t seq = ctx->seq;
+        if (!sender_emit_update(ctx, ctx->target_receiver_id, seq, out_update_buf, out_cap, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+    return 1;
 }
 
 void num8lora_receiver_init(
@@ -313,6 +362,14 @@ void num8lora_receiver_init(
     ctx->max_retries = max_retries;
     ctx->local_dataset_version = local_dataset_version;
     ctx->last_applied_update_id = last_applied_update_id;
+    ctx->last_applied_sender_id = 0u;
+    ctx->last_applied_receiver_id = receiver_id;
+    ctx->last_applied_dataset_version_from = 0u;
+    ctx->last_applied_dataset_version_to = local_dataset_version;
+    ctx->last_applied_remove_count = 0u;
+    ctx->last_applied_add_count = 0u;
+    ctx->last_applied_payload_size = 0u;
+    ctx->last_applied_payload_crc16 = 0u;
     ctx->seq = 1u;
 }
 
@@ -354,6 +411,21 @@ int num8lora_receiver_handle_beacon(
         return 0;
     }
 
+    req.requested_update_id = p.current_update_id;
+    req.receiver_dataset_ver = ctx->local_dataset_version;
+    if (out_cap < 18u)
+    {
+        return 0;
+    }
+    {
+        uint16_t seq = ctx->seq;
+        if (!num8lora_encode_update_request(out_request_buf, out_cap, ctx->receiver_id, hdr.sender_id, seq, &req, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+
     ctx->pending_update_id = p.current_update_id;
     ctx->pending_dataset_version_from = p.dataset_version_from;
     ctx->pending_dataset_version_to = p.dataset_version_to;
@@ -363,10 +435,7 @@ int num8lora_receiver_handle_beacon(
     ctx->pending_payload_crc16 = p.update_payload_crc16;
     ctx->state = NUM8LORA_RECEIVER_WAIT_UPDATE;
     ctx->retries = 0u;
-
-    req.requested_update_id = p.current_update_id;
-    req.receiver_dataset_ver = ctx->local_dataset_version;
-    return num8lora_encode_update_request(out_request_buf, out_cap, ctx->receiver_id, hdr.sender_id, ctx->seq++, &req, out_len);
+    return 1;
 }
 
 int num8lora_receiver_on_update_timeout(
@@ -398,7 +467,19 @@ int num8lora_receiver_on_update_timeout(
     ctx->retries++;
     req.requested_update_id = ctx->pending_update_id;
     req.receiver_dataset_ver = ctx->local_dataset_version;
-    return num8lora_encode_update_request(out_request_buf, out_cap, ctx->receiver_id, ctx->expected_sender_id, ctx->seq++, &req, out_len);
+    if (out_cap < 18u)
+    {
+        return 0;
+    }
+    {
+        uint16_t seq = ctx->seq;
+        if (!num8lora_encode_update_request(out_request_buf, out_cap, ctx->receiver_id, ctx->expected_sender_id, seq, &req, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+    return 1;
 }
 
 int num8lora_receiver_validate_update_data(
@@ -407,7 +488,11 @@ int num8lora_receiver_validate_update_data(
     uint32_t update_len,
     num8lora_update_header_t* out_hdr,
     uint32_t* out_remove_numbers,
+    uint32_t out_remove_capacity,
     uint32_t* out_add_numbers,
+    uint32_t out_add_capacity,
+    uint32_t* out_required_remove_count,
+    uint32_t* out_required_add_count,
     uint16_t* out_error_code)
 {
     num8lora_common_header_t hdr = {0};
@@ -416,6 +501,10 @@ int num8lora_receiver_validate_update_data(
     const uint8_t* ap = NULL;
     uint16_t err = NUM8LORA_ERR_NONE;
     uint16_t payload_crc = 0;
+    uint32_t required_remove = 0u;
+    uint32_t required_add = 0u;
+    uint32_t remove_count = 0u;
+    uint32_t add_count = 0u;
 
     if (out_error_code != NULL)
     {
@@ -424,6 +513,14 @@ int num8lora_receiver_validate_update_data(
     if (out_hdr != NULL)
     {
         memset(out_hdr, 0, sizeof(*out_hdr));
+    }
+    if (out_required_remove_count != NULL)
+    {
+        *out_required_remove_count = 0u;
+    }
+    if (out_required_add_count != NULL)
+    {
+        *out_required_add_count = 0u;
     }
     if (ctx == NULL || update_buf == NULL || out_hdr == NULL)
     {
@@ -461,10 +558,90 @@ int num8lora_receiver_validate_update_data(
         return 0;
     }
 
+    remove_count = (uint32_t)up.remove_count;
+    add_count = (uint32_t)up.add_count;
+    if ((uint64_t)26u + 4u * (uint64_t)remove_count + 4u * (uint64_t)add_count != (uint64_t)update_len)
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_ERR_INTERNAL;
+        }
+        return 0;
+    }
+
+    if (out_required_remove_count != NULL)
+    {
+        *out_required_remove_count = remove_count;
+    }
+    if (out_required_add_count != NULL)
+    {
+        *out_required_add_count = add_count;
+    }
+
+    if (!num8lora_decode_update_numbers(
+        &up,
+        rp,
+        remove_count,
+        ap,
+        add_count,
+        out_remove_numbers,
+        out_remove_capacity,
+        out_add_numbers,
+        out_add_capacity,
+        &required_remove,
+        &required_add))
+    {
+        if (required_remove == remove_count && required_add == add_count && (out_remove_numbers == NULL || out_add_numbers == NULL || out_remove_capacity < remove_count || out_add_capacity < add_count))
+        {
+            if (out_error_code != NULL)
+            {
+                *out_error_code = NUM8LORA_ERR_OUTPUT_TOO_SMALL;
+            }
+        }
+        else if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_ERR_INTERNAL;
+        }
+        return 0;
+    }
+
+    if (!num8lora_validate_update_numbers(&up, out_remove_numbers, out_add_numbers, &err))
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = err;
+        }
+        return 0;
+    }
+
+    if (!num8lora_compute_update_payload_crc16(&up, out_remove_numbers, out_add_numbers, &payload_crc))
+    {
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_ERR_INTERNAL;
+        }
+        return 0;
+    }
+
     if (up.update_id == ctx->last_applied_update_id)
     {
-        *out_hdr = up;
-        return 1;
+        if (hdr.sender_id == ctx->last_applied_sender_id
+            && hdr.receiver_id == ctx->last_applied_receiver_id
+            && up.dataset_version_from == ctx->last_applied_dataset_version_from
+            && up.dataset_version_to == ctx->last_applied_dataset_version_to
+            && up.remove_count == ctx->last_applied_remove_count
+            && up.add_count == ctx->last_applied_add_count
+            && up.reserved0 == 0u
+            && payload_crc == ctx->last_applied_payload_crc16)
+        {
+            *out_hdr = up;
+            return 1;
+        }
+        if (out_error_code != NULL)
+        {
+            *out_error_code = NUM8LORA_ERR_UPDATE_ID_UNKNOWN;
+        }
+        return 0;
     }
 
     if (ctx->state != NUM8LORA_RECEIVER_WAIT_UPDATE)
@@ -485,7 +662,10 @@ int num8lora_receiver_validate_update_data(
         return 0;
     }
 
-    if (up.dataset_version_from != ctx->local_dataset_version || up.dataset_version_to <= up.dataset_version_from)
+    if (up.dataset_version_from != ctx->local_dataset_version
+        || up.dataset_version_from != ctx->pending_dataset_version_from
+        || up.dataset_version_to != ctx->pending_dataset_version_to
+        || up.dataset_version_to <= up.dataset_version_from)
     {
         if (out_error_code != NULL)
         {
@@ -494,34 +674,16 @@ int num8lora_receiver_validate_update_data(
         return 0;
     }
 
-    if ((uint16_t)(16u + 4u * up.remove_count + 4u * up.add_count) != ctx->pending_payload_size)
+    if (up.remove_count != ctx->pending_remove_count || up.add_count != ctx->pending_add_count)
     {
         if (out_error_code != NULL)
         {
-            *out_error_code = NUM8LORA_ERR_INTERNAL;
+            *out_error_code = NUM8LORA_ERR_UPDATE_ID_UNKNOWN;
         }
         return 0;
     }
 
-    if (!num8lora_decode_update_numbers(&up, rp, ap, out_remove_numbers, out_add_numbers))
-    {
-        if (out_error_code != NULL)
-        {
-            *out_error_code = NUM8LORA_ERR_INTERNAL;
-        }
-        return 0;
-    }
-
-    if (!num8lora_validate_update_numbers(&up, out_remove_numbers, out_add_numbers, &err))
-    {
-        if (out_error_code != NULL)
-        {
-            *out_error_code = err;
-        }
-        return 0;
-    }
-
-    if (!num8lora_compute_update_payload_crc16(&up, out_remove_numbers, out_add_numbers, &payload_crc))
+    if ((uint16_t)update_payload_size((uint8_t)up.remove_count, (uint8_t)up.add_count) != ctx->pending_payload_size)
     {
         if (out_error_code != NULL)
         {
@@ -562,7 +724,19 @@ int num8lora_receiver_encode_ack(
     }
     p.ack_update_id = ack_update_id;
     p.receiver_dataset_ver = ctx->local_dataset_version;
-    return num8lora_encode_ack(out_ack_buf, out_cap, ctx->receiver_id, sender_id, ctx->seq++, &p, out_len);
+    if (out_cap < 18u)
+    {
+        return 0;
+    }
+    {
+        uint16_t seq = ctx->seq;
+        if (!num8lora_encode_ack(out_ack_buf, out_cap, ctx->receiver_id, sender_id, seq, &p, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+    return 1;
 }
 
 int num8lora_receiver_encode_nack(
@@ -587,5 +761,17 @@ int num8lora_receiver_encode_nack(
     p.nack_update_id = nack_update_id;
     p.error_code = error_code;
     p.detail = detail;
-    return num8lora_encode_nack(out_nack_buf, out_cap, ctx->receiver_id, sender_id, ctx->seq++, &p, out_len);
+    if (out_cap < 18u)
+    {
+        return 0;
+    }
+    {
+        uint16_t seq = ctx->seq;
+        if (!num8lora_encode_nack(out_nack_buf, out_cap, ctx->receiver_id, sender_id, seq, &p, out_len))
+        {
+            return 0;
+        }
+        ctx->seq = (uint16_t)(seq + 1u);
+    }
+    return 1;
 }

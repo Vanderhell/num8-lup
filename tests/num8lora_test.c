@@ -83,6 +83,78 @@ static int test_update_data(void)
     return 0;
 }
 
+static int test_update_numbers_capacity(void)
+{
+    uint8_t buf[2200];
+    uint32_t len = 0u;
+    num8lora_update_header_t h;
+    num8lora_common_header_t hdr;
+    num8lora_update_header_t out_h;
+    const uint8_t* rp = NULL;
+    const uint8_t* ap = NULL;
+    uint32_t rem[255];
+    uint32_t add[255];
+    uint32_t out_rem[255];
+    uint32_t out_add[255];
+    uint32_t required_remove = 0u;
+    uint32_t required_add = 0u;
+    uint16_t i;
+
+    for (i = 0u; i < 255u; ++i)
+    {
+        rem[i] = 1000u + (uint32_t)i;
+        add[i] = 2000u + (uint32_t)i;
+    }
+
+    h.update_id = 77u;
+    h.dataset_version_from = 10u;
+    h.dataset_version_to = 11u;
+    h.reserved0 = 0u;
+
+    h.remove_count = 0u;
+    h.add_count = 0u;
+    CHECK(num8lora_encode_update_data(buf, sizeof(buf), 1u, 2u, 9u, &h, NULL, NULL, &len));
+    CHECK(len == 26u);
+    CHECK(num8lora_decode_update_data_header(buf, len, &hdr, &out_h, &rp, &ap));
+    CHECK(num8lora_decode_update_numbers(&out_h, rp, 0u, ap, 0u, NULL, 0u, NULL, 0u, &required_remove, &required_add));
+    CHECK(required_remove == 0u && required_add == 0u);
+
+    h.remove_count = 1u;
+    h.add_count = 1u;
+    CHECK(num8lora_encode_update_data(buf, sizeof(buf), 1u, 2u, 9u, &h, rem, add, &len));
+    CHECK(len == 34u);
+    CHECK(num8lora_decode_update_data_header(buf, len, &hdr, &out_h, &rp, &ap));
+    out_rem[0] = 0u;
+    out_add[0] = 0u;
+    CHECK(!num8lora_decode_update_numbers(&out_h, rp, 1u, ap, 1u, out_rem, 0u, out_add, 1u, &required_remove, &required_add));
+    CHECK(required_remove == 1u && required_add == 1u);
+    CHECK(out_rem[0] == 0u && out_add[0] == 0u);
+    CHECK(num8lora_decode_update_numbers(&out_h, rp, 1u, ap, 1u, out_rem, 1u, out_add, 1u, &required_remove, &required_add));
+    CHECK(out_rem[0] == rem[0] && out_add[0] == add[0]);
+
+    h.remove_count = 254u;
+    h.add_count = 1u;
+    CHECK(num8lora_encode_update_data(buf, sizeof(buf), 1u, 2u, 9u, &h, rem, add, &len));
+    CHECK(len == 26u + 4u * 255u);
+    CHECK(num8lora_decode_update_data_header(buf, len, &hdr, &out_h, &rp, &ap));
+    CHECK(!num8lora_decode_update_numbers(&out_h, rp, 254u, ap, 1u, out_rem, 253u, out_add, 1u, &required_remove, &required_add));
+    CHECK(required_remove == 254u && required_add == 1u);
+    CHECK(num8lora_decode_update_numbers(&out_h, rp, 254u, ap, 1u, out_rem, 254u, out_add, 1u, &required_remove, &required_add));
+    CHECK(out_rem[0] == rem[0] && out_rem[253] == rem[253] && out_add[0] == add[0]);
+
+    h.remove_count = 255u;
+    h.add_count = 255u;
+    CHECK(num8lora_encode_update_data(buf, sizeof(buf), 1u, 2u, 9u, &h, rem, add, &len));
+    CHECK(len == 2066u);
+    CHECK(num8lora_decode_update_data_header(buf, len, &hdr, &out_h, &rp, &ap));
+    CHECK(!num8lora_decode_update_numbers(&out_h, rp, 255u, ap, 255u, out_rem, 254u, out_add, 255u, &required_remove, &required_add));
+    CHECK(required_remove == 255u && required_add == 255u);
+    CHECK(num8lora_decode_update_numbers(&out_h, rp, 255u, ap, 255u, out_rem, 255u, out_add, 255u, &required_remove, &required_add));
+    CHECK(out_rem[254] == rem[254] && out_add[254] == add[254]);
+
+    return 0;
+}
+
 static int test_validate_lists(void)
 {
     num8lora_update_header_t h;
@@ -148,6 +220,7 @@ int main(void)
 {
     CHECK(test_beacon() == 0);
     CHECK(test_update_data() == 0);
+    CHECK(test_update_numbers_capacity() == 0);
     CHECK(test_validate_lists() == 0);
     CHECK(test_failure_outputs() == 0);
     printf("num8lora_test OK\n");

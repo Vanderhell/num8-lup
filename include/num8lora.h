@@ -44,7 +44,8 @@ enum
     NUM8LORA_ERR_NUMBER_IN_BOTH = 9,
     NUM8LORA_ERR_APPLY_FAILED = 10,
     NUM8LORA_ERR_BUSY = 11,
-    NUM8LORA_ERR_INTERNAL = 12
+    NUM8LORA_ERR_INTERNAL = 12,
+    NUM8LORA_ERR_OUTPUT_TOO_SMALL = 13
 };
 
 typedef enum num8lora_sender_state_e
@@ -144,6 +145,14 @@ typedef struct num8lora_receiver_ctx_s
 
     uint32_t local_dataset_version;
     uint32_t last_applied_update_id;
+    uint16_t last_applied_sender_id;
+    uint16_t last_applied_receiver_id;
+    uint32_t last_applied_dataset_version_from;
+    uint32_t last_applied_dataset_version_to;
+    uint8_t last_applied_remove_count;
+    uint8_t last_applied_add_count;
+    uint16_t last_applied_payload_size;
+    uint16_t last_applied_payload_crc16;
 
     uint32_t pending_update_id;
     uint32_t pending_dataset_version_from;
@@ -257,9 +266,15 @@ NUM8LORA_API num8lora_status_t num8lora_validate_update_numbers(
 NUM8LORA_API num8lora_status_t num8lora_decode_update_numbers(
     const num8lora_update_header_t* hdr,
     const uint8_t* remove_ptr,
+    uint32_t remove_capacity,
     const uint8_t* add_ptr,
+    uint32_t add_capacity,
     uint32_t* out_remove_numbers,
-    uint32_t* out_add_numbers);
+    uint32_t out_remove_capacity,
+    uint32_t* out_add_numbers,
+    uint32_t out_add_capacity,
+    uint32_t* out_required_remove_count,
+    uint32_t* out_required_add_count);
 
 NUM8LORA_API num8lora_status_t num8lora_compute_update_payload_crc16(
     const num8lora_update_header_t* hdr,
@@ -328,7 +343,11 @@ NUM8LORA_API num8lora_status_t num8lora_receiver_validate_update_data(
     uint32_t update_len,
     num8lora_update_header_t* out_hdr,
     uint32_t* out_remove_numbers,
+    uint32_t out_remove_capacity,
     uint32_t* out_add_numbers,
+    uint32_t out_add_capacity,
+    uint32_t* out_required_remove_count,
+    uint32_t* out_required_add_count,
     uint16_t* out_error_code);
 NUM8LORA_API num8lora_status_t num8lora_receiver_encode_ack(
     num8lora_receiver_ctx_t* ctx,

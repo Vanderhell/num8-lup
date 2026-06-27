@@ -35,6 +35,39 @@ static uint32_t ld32(const uint8_t* p)
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
+static uint16_t crc16_update(uint16_t crc, uint8_t byte)
+{
+    uint32_t b;
+
+    crc ^= (uint16_t)((uint16_t)byte << 8);
+    for (b = 0u; b < 8u; ++b)
+    {
+        if ((crc & 0x8000u) != 0u)
+        {
+            crc = (uint16_t)((crc << 1) ^ 0x1021u);
+        }
+        else
+        {
+            crc = (uint16_t)(crc << 1);
+        }
+    }
+    return crc;
+}
+
+static uint16_t crc16_update_u16(uint16_t crc, uint16_t v)
+{
+    crc = crc16_update(crc, (uint8_t)(v & 0xFFu));
+    return crc16_update(crc, (uint8_t)((v >> 8) & 0xFFu));
+}
+
+static uint16_t crc16_update_u32(uint16_t crc, uint32_t v)
+{
+    crc = crc16_update(crc, (uint8_t)(v & 0xFFu));
+    crc = crc16_update(crc, (uint8_t)((v >> 8) & 0xFFu));
+    crc = crc16_update(crc, (uint8_t)((v >> 16) & 0xFFu));
+    return crc16_update(crc, (uint8_t)((v >> 24) & 0xFFu));
+}
+
 static int valid_number(uint32_t v)
 {
     return v <= NUM8LORA_MAX_VALUE;
@@ -514,13 +547,42 @@ int num8lora_validate_update_numbers(const num8lora_update_header_t* hdr, const 
 int num8lora_decode_update_numbers(
     const num8lora_update_header_t* hdr,
     const uint8_t* remove_ptr,
+    uint32_t remove_capacity,
     const uint8_t* add_ptr,
+    uint32_t add_capacity,
     uint32_t* out_remove_numbers,
-    uint32_t* out_add_numbers)
+    uint32_t out_remove_capacity,
+    uint32_t* out_add_numbers,
+    uint32_t out_add_capacity,
+    uint32_t* out_required_remove_count,
+    uint32_t* out_required_add_count)
 {
     uint32_t i;
     uint32_t rc;
     uint32_t ac;
+
+    if (out_required_remove_count != NULL)
+    {
+        *out_required_remove_count = 0u;
+    }
+    if (out_required_add_count != NULL)
+    {
+        *out_required_add_count = 0u;
+    }
+    if (out_remove_numbers != NULL && out_remove_capacity > 0u)
+    {
+        for (i = 0u; i < out_remove_capacity; ++i)
+        {
+            out_remove_numbers[i] = 0u;
+        }
+    }
+    if (out_add_numbers != NULL && out_add_capacity > 0u)
+    {
+        for (i = 0u; i < out_add_capacity; ++i)
+        {
+            out_add_numbers[i] = 0u;
+        }
+    }
 
     if (hdr == NULL || remove_ptr == NULL || add_ptr == NULL)
     {
@@ -530,22 +592,30 @@ int num8lora_decode_update_numbers(
     rc = (uint32_t)hdr->remove_count;
     ac = (uint32_t)hdr->add_count;
 
-    if (out_remove_numbers != NULL)
+    if (out_required_remove_count != NULL)
     {
-        for (i = 0; i < rc; ++i)
-        {
-            out_remove_numbers[i] = 0u;
-        }
+        *out_required_remove_count = rc;
     }
-    if (out_add_numbers != NULL)
+    if (out_required_add_count != NULL)
     {
-        for (i = 0; i < ac; ++i)
-        {
-            out_add_numbers[i] = 0u;
-        }
+        *out_required_add_count = ac;
+    }
+
+    if (remove_capacity < rc || add_capacity < ac)
+    {
+        return 0;
     }
 
     if ((rc > 0u && out_remove_numbers == NULL) || (ac > 0u && out_add_numbers == NULL))
+    {
+        return 0;
+    }
+
+    if (out_remove_numbers != NULL && out_remove_capacity < rc)
+    {
+        return 0;
+    }
+    if (out_add_numbers != NULL && out_add_capacity < ac)
     {
         return 0;
     }
@@ -568,9 +638,8 @@ int num8lora_compute_update_payload_crc16(
     const uint32_t* add_numbers,
     uint16_t* out_crc16)
 {
-    uint8_t temp[16 + 4u * 255u + 4u * 255u];
-    uint32_t off = 0;
     uint32_t i;
+    uint16_t crc = 0xFFFFu;
 
     if (out_crc16 != NULL)
     {
@@ -585,25 +654,23 @@ int num8lora_compute_update_payload_crc16(
         return 0;
     }
 
-    st32(&temp[off], hdr->update_id); off += 4u;
-    st32(&temp[off], hdr->dataset_version_from); off += 4u;
-    st32(&temp[off], hdr->dataset_version_to); off += 4u;
-    temp[off++] = hdr->remove_count;
-    temp[off++] = hdr->add_count;
-    st16(&temp[off], 0u); off += 2u;
+    crc = crc16_update_u32(crc, hdr->update_id);
+    crc = crc16_update_u32(crc, hdr->dataset_version_from);
+    crc = crc16_update_u32(crc, hdr->dataset_version_to);
+    crc = crc16_update(crc, hdr->remove_count);
+    crc = crc16_update(crc, hdr->add_count);
+    crc = crc16_update_u16(crc, 0u);
 
     for (i = 0; i < (uint32_t)hdr->remove_count; ++i)
     {
-        st32(&temp[off], remove_numbers[i]);
-        off += 4u;
+        crc = crc16_update_u32(crc, remove_numbers[i]);
     }
     for (i = 0; i < (uint32_t)hdr->add_count; ++i)
     {
-        st32(&temp[off], add_numbers[i]);
-        off += 4u;
+        crc = crc16_update_u32(crc, add_numbers[i]);
     }
 
-    *out_crc16 = num8lora_crc16_ccitt_false(temp, off);
+    *out_crc16 = crc;
     return 1;
 }
 

@@ -126,6 +126,7 @@ int num8lora_receiver_apply_update_data_to_num8(
     uint32_t add_numbers[255];
     uint32_t new_version = 0;
     uint32_t new_last = 0;
+    uint16_t seq = 0u;
 
     if (out_error_code != 0)
     {
@@ -155,8 +156,16 @@ int num8lora_receiver_apply_update_data_to_num8(
         return 0;
     }
 
-    if (!num8lora_receiver_validate_update_data(ctx, update_buf, update_len, &up, remove_numbers, add_numbers, &err))
+    if (!num8lora_receiver_validate_update_data(ctx, update_buf, update_len, &up, remove_numbers, 255u, add_numbers, 255u, NULL, NULL, &err))
     {
+        if (out_cap < 18u)
+        {
+            if (out_error_code != 0)
+            {
+                *out_error_code = NUM8LORA_ERR_INTERNAL;
+            }
+            return 0;
+        }
         if (!num8lora_receiver_encode_nack(ctx, hdr.sender_id, ctx->pending_update_id, err, 0u, out_response_buf, out_cap, out_response_len))
         {
             if (out_error_code != 0)
@@ -174,6 +183,14 @@ int num8lora_receiver_apply_update_data_to_num8(
 
     if (up.update_id == ctx->last_applied_update_id)
     {
+        if (out_cap < 18u)
+        {
+            if (out_error_code != 0)
+            {
+                *out_error_code = NUM8LORA_ERR_INTERNAL;
+            }
+            return 0;
+        }
         if (!num8lora_receiver_encode_ack(ctx, hdr.sender_id, up.update_id, out_response_buf, out_cap, out_response_len))
         {
             if (out_error_code != 0)
@@ -183,6 +200,15 @@ int num8lora_receiver_apply_update_data_to_num8(
             return 0;
         }
         return 1;
+    }
+
+    if (out_cap < 18u)
+    {
+        if (out_error_code != 0)
+        {
+            *out_error_code = NUM8LORA_ERR_INTERNAL;
+        }
+        return 0;
     }
 
     if (!num8lora_apply_update_to_num8(
@@ -211,11 +237,8 @@ int num8lora_receiver_apply_update_data_to_num8(
         return 1;
     }
 
-    ctx->local_dataset_version = new_version;
-    ctx->last_applied_update_id = new_last;
-    ctx->state = NUM8LORA_RECEIVER_SCAN;
-
-    if (!num8lora_receiver_encode_ack(ctx, hdr.sender_id, up.update_id, out_response_buf, out_cap, out_response_len))
+    seq = ctx->seq;
+    if (!num8lora_encode_ack(out_response_buf, out_cap, ctx->receiver_id, hdr.sender_id, seq, &(num8lora_ack_payload_t){ up.update_id, new_version }, out_response_len))
     {
         if (out_error_code != 0)
         {
@@ -223,6 +246,19 @@ int num8lora_receiver_apply_update_data_to_num8(
         }
         return 0;
     }
+
+    ctx->seq = (uint16_t)(seq + 1u);
+    ctx->local_dataset_version = new_version;
+    ctx->last_applied_update_id = new_last;
+    ctx->last_applied_sender_id = hdr.sender_id;
+    ctx->last_applied_receiver_id = ctx->receiver_id;
+    ctx->last_applied_dataset_version_from = up.dataset_version_from;
+    ctx->last_applied_dataset_version_to = up.dataset_version_to;
+    ctx->last_applied_remove_count = up.remove_count;
+    ctx->last_applied_add_count = up.add_count;
+    ctx->last_applied_payload_size = ctx->pending_payload_size;
+    ctx->last_applied_payload_crc16 = ctx->pending_payload_crc16;
+    ctx->state = NUM8LORA_RECEIVER_SCAN;
 
     if (out_error_code != 0)
     {
