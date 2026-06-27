@@ -5,6 +5,17 @@
 
 #define C(x) do { if(!(x)) { fprintf(stderr,"FAIL %d\n",__LINE__); return 1; } } while(0)
 
+static void set_u16(uint8_t* p, uint16_t v)
+{
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)((v >> 8) & 0xFFu);
+}
+
+static void refresh_async_crc(uint8_t* frame, uint32_t len)
+{
+    set_u16(&frame[len - 2u], num8lora_op_crc16_ccitt_false(frame, len - 2u));
+}
+
 typedef struct state_s { int present[1000]; uint32_t apply_calls; } state_t;
 
 static int apply_fn(void* u, uint8_t op_type, uint32_t value)
@@ -54,7 +65,9 @@ static int test_sender_routing_gates(void)
     C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
     C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u && slots[0].last_acked_op_id == 0u);
 
-    C(num8lora_op_encode_request(out, sizeof(out), 0u, 10u, 1u, &req, &out_len));
+    set_u16(out + 2, 0u);
+    set_u16(out + 12, 0u);
+    refresh_async_crc(out, out_len);
     C(!num8lora_sender_handle_rx(&snd, now, out, out_len));
     C(slots[0].waiting_ack == 1u && slots[0].inflight_op_id == 1u);
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(num8_lup C)
+project(num8_lup C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -14,12 +14,14 @@ option(NUM8LORA_BUILD_NUM8_ADAPTER "Build the optional NUM8 adapter" OFF)
 set(NUM8LORA_NUM8_ROOT "" CACHE PATH "Path to the NUM8 dependency used by the optional adapter")
 
 add_library(num8lora_metadata_core STATIC
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_metadata.c
 )
 target_include_directories(num8lora_metadata_core PUBLIC ${NUM8LORA_INCLUDE_DIR})
 
 # Legacy combined library
 add_library(num8lora_static STATIC
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora.c
     ${NUM8LORA_SRC_DIR}/num8lora_runtime.c
@@ -28,6 +30,7 @@ target_include_directories(num8lora_static PUBLIC ${NUM8LORA_INCLUDE_DIR})
 target_link_libraries(num8lora_static PUBLIC num8lora_metadata_core)
 
 add_library(num8lora_shared SHARED
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora.c
     ${NUM8LORA_SRC_DIR}/num8lora_runtime.c
@@ -39,12 +42,14 @@ set_target_properties(num8lora_shared PROPERTIES OUTPUT_NAME num8lora WINDOWS_EX
 
 # Async split protocol libraries
 add_library(num8lora_sender_static STATIC
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora_sender.c
 )
 target_include_directories(num8lora_sender_static PUBLIC ${NUM8LORA_INCLUDE_DIR})
 
 add_library(num8lora_sender_shared SHARED
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora_sender.c
 )
@@ -53,6 +58,7 @@ target_compile_definitions(num8lora_sender_shared PRIVATE NUM8LORA_BUILD_SHARED=
 set_target_properties(num8lora_sender_shared PROPERTIES OUTPUT_NAME num8lora_sender WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(num8lora_receiver_static STATIC
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora_receiver.c
 )
@@ -60,6 +66,7 @@ target_include_directories(num8lora_receiver_static PUBLIC ${NUM8LORA_INCLUDE_DI
 target_link_libraries(num8lora_receiver_static PUBLIC num8lora_metadata_core)
 
 add_library(num8lora_receiver_shared SHARED
+    ${NUM8LORA_SRC_DIR}/num8lora_codec.c
     ${NUM8LORA_SRC_DIR}/num8lora_op.c
     ${NUM8LORA_SRC_DIR}/num8lora_receiver.c
     ${NUM8LORA_SRC_DIR}/num8lora_metadata.c
@@ -120,6 +127,41 @@ target_compile_definitions(num8lora_adapter_config_test PRIVATE
 add_executable(num8lora_async_demo examples/async_demo.c)
 target_link_libraries(num8lora_async_demo PRIVATE num8lora_sender_static num8lora_receiver_static)
 
+add_executable(num8lora_codec_contract_test ${NUM8LORA_TEST_DIR}/num8lora_codec_contract_test.c)
+target_link_libraries(num8lora_codec_contract_test PRIVATE num8lora_static num8lora_sender_static)
+target_compile_definitions(num8lora_codec_contract_test PRIVATE
+    NUM8LORA_BUILD_HOSTED_METADATA=$<IF:$<BOOL:${NUM8LORA_BUILD_HOSTED_METADATA}>,1,0>
+    NUM8LORA_BUILD_NUM8_ADAPTER=$<IF:$<BOOL:${NUM8LORA_BUILD_NUM8_ADAPTER}>,1,0>)
+
+add_executable(num8lora_header_smoke_num8lora ${NUM8LORA_TEST_DIR}/header_smoke_num8lora.c)
+target_include_directories(num8lora_header_smoke_num8lora PRIVATE ${NUM8LORA_INCLUDE_DIR})
+
+add_executable(num8lora_header_smoke_num8lora_op ${NUM8LORA_TEST_DIR}/header_smoke_num8lora_op.c)
+target_include_directories(num8lora_header_smoke_num8lora_op PRIVATE ${NUM8LORA_INCLUDE_DIR})
+
+add_executable(num8lora_header_smoke_num8lora_metadata ${NUM8LORA_TEST_DIR}/header_smoke_num8lora_metadata.c)
+target_include_directories(num8lora_header_smoke_num8lora_metadata PRIVATE ${NUM8LORA_INCLUDE_DIR})
+
+add_executable(num8lora_header_smoke_num8lora_sender ${NUM8LORA_TEST_DIR}/header_smoke_num8lora_sender.c)
+target_include_directories(num8lora_header_smoke_num8lora_sender PRIVATE ${NUM8LORA_INCLUDE_DIR})
+target_link_libraries(num8lora_header_smoke_num8lora_sender PRIVATE num8lora_sender_static)
+
+add_executable(num8lora_header_smoke_num8lora_receiver ${NUM8LORA_TEST_DIR}/header_smoke_num8lora_receiver.c)
+target_include_directories(num8lora_header_smoke_num8lora_receiver PRIVATE ${NUM8LORA_INCLUDE_DIR})
+target_link_libraries(num8lora_header_smoke_num8lora_receiver PRIVATE num8lora_receiver_static)
+
+add_executable(num8lora_header_smoke_repeat ${NUM8LORA_TEST_DIR}/header_smoke_repeat.c)
+target_include_directories(num8lora_header_smoke_repeat PRIVATE ${NUM8LORA_INCLUDE_DIR})
+
+add_executable(num8lora_header_smoke_cpp ${NUM8LORA_TEST_DIR}/header_smoke_cpp.cpp)
+target_include_directories(num8lora_header_smoke_cpp PRIVATE ${NUM8LORA_INCLUDE_DIR})
+
+add_executable(num8lora_header_smoke_mtu
+    ${NUM8LORA_TEST_DIR}/header_smoke_mtu_a.c
+    ${NUM8LORA_TEST_DIR}/header_smoke_mtu_b.c)
+target_include_directories(num8lora_header_smoke_mtu PRIVATE ${NUM8LORA_INCLUDE_DIR})
+target_link_libraries(num8lora_header_smoke_mtu PRIVATE num8lora_static)
+
 enable_testing()
 add_test(NAME num8lora_test COMMAND num8lora_test)
 add_test(NAME num8lora_runtime_test COMMAND num8lora_runtime_test)
@@ -127,6 +169,15 @@ add_test(NAME num8lora_op_test COMMAND num8lora_op_test)
 add_test(NAME num8lora_async_test COMMAND num8lora_async_test)
 add_test(NAME num8lora_metadata_test COMMAND num8lora_metadata_test)
 add_test(NAME num8lora_adapter_config_test COMMAND num8lora_adapter_config_test)
+add_test(NAME num8lora_codec_contract_test COMMAND num8lora_codec_contract_test)
+add_test(NAME num8lora_header_smoke_num8lora COMMAND num8lora_header_smoke_num8lora)
+add_test(NAME num8lora_header_smoke_num8lora_op COMMAND num8lora_header_smoke_num8lora_op)
+add_test(NAME num8lora_header_smoke_num8lora_metadata COMMAND num8lora_header_smoke_num8lora_metadata)
+add_test(NAME num8lora_header_smoke_num8lora_sender COMMAND num8lora_header_smoke_num8lora_sender)
+add_test(NAME num8lora_header_smoke_num8lora_receiver COMMAND num8lora_header_smoke_num8lora_receiver)
+add_test(NAME num8lora_header_smoke_repeat COMMAND num8lora_header_smoke_repeat)
+add_test(NAME num8lora_header_smoke_cpp COMMAND num8lora_header_smoke_cpp)
+add_test(NAME num8lora_header_smoke_mtu COMMAND num8lora_header_smoke_mtu)
 
 add_test(
     NAME num8lora_hosted_metadata_disabled_build

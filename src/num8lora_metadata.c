@@ -1,4 +1,5 @@
 #include "num8lora_metadata.h"
+#include "num8lora_codec.h"
 
 #include <string.h>
 
@@ -6,63 +7,6 @@
 #define NUM8LORA_METADATA_MAGIC1 '8'
 #define NUM8LORA_METADATA_MAGIC2 'A'
 #define NUM8LORA_METADATA_MAGIC3 'M'
-
-static void st16(uint8_t* p, uint16_t v)
-{
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8) & 0xFFu);
-}
-
-static void st32(uint8_t* p, uint32_t v)
-{
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8) & 0xFFu);
-    p[2] = (uint8_t)((v >> 16) & 0xFFu);
-    p[3] = (uint8_t)((v >> 24) & 0xFFu);
-}
-
-static uint16_t ld16(const uint8_t* p)
-{
-    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-}
-
-static uint32_t ld32(const uint8_t* p)
-{
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-static uint16_t crc16_update(uint16_t crc, uint8_t byte)
-{
-    uint32_t i;
-
-    crc ^= (uint16_t)((uint16_t)byte << 8);
-    for (i = 0u; i < 8u; ++i)
-    {
-        if ((crc & 0x8000u) != 0u)
-        {
-            crc = (uint16_t)((crc << 1) ^ 0x1021u);
-        }
-        else
-        {
-            crc = (uint16_t)(crc << 1);
-        }
-    }
-    return crc;
-}
-
-static uint16_t crc16_update_u16(uint16_t crc, uint16_t v)
-{
-    crc = crc16_update(crc, (uint8_t)(v & 0xFFu));
-    return crc16_update(crc, (uint8_t)((v >> 8) & 0xFFu));
-}
-
-static uint16_t crc16_update_u32(uint16_t crc, uint32_t v)
-{
-    crc = crc16_update(crc, (uint8_t)(v & 0xFFu));
-    crc = crc16_update(crc, (uint8_t)((v >> 8) & 0xFFu));
-    crc = crc16_update(crc, (uint8_t)((v >> 16) & 0xFFu));
-    return crc16_update(crc, (uint8_t)((v >> 24) & 0xFFu));
-}
 
 uint32_t num8lora_metadata_record_size(void)
 {
@@ -123,19 +67,14 @@ num8lora_metadata_status_t num8lora_metadata_encode_record(
     out_buf[1] = NUM8LORA_METADATA_MAGIC1;
     out_buf[2] = NUM8LORA_METADATA_MAGIC2;
     out_buf[3] = NUM8LORA_METADATA_MAGIC3;
-    st32(&out_buf[4], record->format_version);
-    st32(&out_buf[8], record->reserved0);
-    st32(&out_buf[12], record->stream_id);
-    st32(&out_buf[16], record->stream_epoch);
-    st32(&out_buf[20], record->last_applied_op_id);
+    num8lora_codec_write_u32_le(&out_buf[4], record->format_version);
+    num8lora_codec_write_u32_le(&out_buf[8], record->reserved0);
+    num8lora_codec_write_u32_le(&out_buf[12], record->stream_id);
+    num8lora_codec_write_u32_le(&out_buf[16], record->stream_epoch);
+    num8lora_codec_write_u32_le(&out_buf[20], record->last_applied_op_id);
 
-    crc = crc16_update_u32(crc, record->format_version);
-    crc = crc16_update_u32(crc, record->reserved0);
-    crc = crc16_update_u32(crc, record->stream_id);
-    crc = crc16_update_u32(crc, record->stream_epoch);
-    crc = crc16_update_u32(crc, record->last_applied_op_id);
-    crc = crc16_update_u16(crc, 0u);
-    st16(&out_buf[24], crc);
+    crc = num8lora_codec_crc16_ccitt_false(&out_buf[4], 20u);
+    num8lora_codec_write_u16_le(&out_buf[24], crc);
 
     *out_len = num8lora_metadata_record_size();
     return NUM8LORA_METADATA_STATUS_SUCCESS;
@@ -182,11 +121,11 @@ num8lora_metadata_status_t num8lora_metadata_decode_record(
         return NUM8LORA_METADATA_STATUS_FAILURE;
     }
 
-    out_record->format_version = ld32(&buf[4]);
-    out_record->reserved0 = ld32(&buf[8]);
-    out_record->stream_id = ld32(&buf[12]);
-    out_record->stream_epoch = ld32(&buf[16]);
-    out_record->last_applied_op_id = ld32(&buf[20]);
+    out_record->format_version = num8lora_codec_read_u32_le(&buf[4]);
+    out_record->reserved0 = num8lora_codec_read_u32_le(&buf[8]);
+    out_record->stream_id = num8lora_codec_read_u32_le(&buf[12]);
+    out_record->stream_epoch = num8lora_codec_read_u32_le(&buf[16]);
+    out_record->last_applied_op_id = num8lora_codec_read_u32_le(&buf[20]);
 
     if (out_record->format_version != NUM8LORA_METADATA_FORMAT_VERSION)
     {
@@ -205,13 +144,8 @@ num8lora_metadata_status_t num8lora_metadata_decode_record(
         return NUM8LORA_METADATA_STATUS_FAILURE;
     }
 
-    crc = crc16_update_u32(0xFFFFu, out_record->format_version);
-    crc = crc16_update_u32(crc, out_record->reserved0);
-    crc = crc16_update_u32(crc, out_record->stream_id);
-    crc = crc16_update_u32(crc, out_record->stream_epoch);
-    crc = crc16_update_u32(crc, out_record->last_applied_op_id);
-    crc = crc16_update_u16(crc, 0u);
-    if (crc != ld16(&buf[24]))
+    crc = num8lora_codec_crc16_ccitt_false(&buf[4], 20u);
+    if (crc != num8lora_codec_read_u16_le(&buf[24]))
     {
         if (out_error_code != NULL)
         {
