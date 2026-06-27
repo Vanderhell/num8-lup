@@ -1,4 +1,5 @@
 #include "num8lora_receiver.h"
+#include <stddef.h>
 
 #define MAX_VALUE 99999999u
 #define ACK_FRAME_LEN 18u
