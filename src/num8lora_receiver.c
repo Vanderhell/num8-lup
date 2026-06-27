@@ -1,6 +1,8 @@
 #include "num8lora_receiver.h"
 
 #define MAX_VALUE 99999999u
+#define ACK_FRAME_LEN 18u
+#define NACK_FRAME_LEN 22u
 
 void num8lora_receiver_init(num8lora_receiver_t* r, uint16_t receiver_id, uint16_t expected_sender_id, uint32_t stream_id, uint32_t last_applied_op_id)
 {
@@ -101,6 +103,10 @@ int num8lora_receiver_handle_data(
     }
     if (d.stream_id != r->stream_id)
     {
+        if (out_cap < NACK_FRAME_LEN)
+        {
+            return 0;
+        }
         nack.stream_id = r->stream_id;
         nack.error_code = NUM8LORA_OP_ERR_STREAM;
         nack.detail = 0u;
@@ -109,6 +115,10 @@ int num8lora_receiver_handle_data(
     }
     if (d.value > MAX_VALUE || (d.op_type != NUM8LORA_OP_ADD && d.op_type != NUM8LORA_OP_REMOVE))
     {
+        if (out_cap < NACK_FRAME_LEN)
+        {
+            return 0;
+        }
         nack.stream_id = r->stream_id;
         nack.error_code = NUM8LORA_OP_ERR_INVALID_VALUE;
         nack.detail = 0u;
@@ -118,6 +128,10 @@ int num8lora_receiver_handle_data(
 
     if (d.op_id <= r->last_applied_op_id)
     {
+        if (out_cap < ACK_FRAME_LEN)
+        {
+            return 0;
+        }
         ack.stream_id = r->stream_id;
         ack.ack_op_id = r->last_applied_op_id;
         return num8lora_op_encode_ack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &ack, out_len);
@@ -125,6 +139,10 @@ int num8lora_receiver_handle_data(
 
     if (d.op_id != r->last_applied_op_id + 1u)
     {
+        if (out_cap < NACK_FRAME_LEN)
+        {
+            return 0;
+        }
         nack.stream_id = r->stream_id;
         nack.error_code = NUM8LORA_OP_ERR_SEQUENCE_GAP;
         nack.detail = 0u;
@@ -132,20 +150,26 @@ int num8lora_receiver_handle_data(
         return num8lora_op_encode_nack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &nack, out_len);
     }
 
-    if (apply_fn != NULL)
+    if (out_cap < NACK_FRAME_LEN)
     {
-        if (!apply_fn(apply_user, d.op_type, d.value))
-        {
-            nack.stream_id = r->stream_id;
-            nack.error_code = NUM8LORA_OP_ERR_APPLY_FAILED;
-            nack.detail = 0u;
-            nack.expected_next_op_id = r->last_applied_op_id + 1u;
-            return num8lora_op_encode_nack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &nack, out_len);
-        }
+        return 0;
+    }
+
+    if (apply_fn == NULL || !apply_fn(apply_user, d.op_type, d.value))
+    {
+        nack.stream_id = r->stream_id;
+        nack.error_code = NUM8LORA_OP_ERR_APPLY_FAILED;
+        nack.detail = 0u;
+        nack.expected_next_op_id = r->last_applied_op_id + 1u;
+        return num8lora_op_encode_nack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &nack, out_len);
     }
 
     r->last_applied_op_id = d.op_id;
 
+    if (out_cap < ACK_FRAME_LEN)
+    {
+        return 0;
+    }
     ack.stream_id = r->stream_id;
     ack.ack_op_id = r->last_applied_op_id;
     return num8lora_op_encode_ack(out_buf, out_cap, r->receiver_id, hdr.sender_id, r->seq++, &ack, out_len);

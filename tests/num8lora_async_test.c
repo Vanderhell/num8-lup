@@ -5,16 +5,25 @@
 
 #define C(x) do { if(!(x)) { fprintf(stderr,"FAIL %d\n",__LINE__); return 1; } } while(0)
 
-typedef struct state_s { int present[1000]; } state_t;
+typedef struct state_s { int present[1000]; uint32_t apply_calls; } state_t;
 
 static int apply_fn(void* u, uint8_t op_type, uint32_t value)
 {
     state_t* s=(state_t*)u;
     if(value>=1000u) return 0;
+    s->apply_calls++;
     if(op_type==NUM8LORA_OP_ADD) s->present[value]=1;
     else if(op_type==NUM8LORA_OP_REMOVE) s->present[value]=0;
     else return 0;
     return 1;
+}
+
+static int fail_apply_fn(void* u, uint8_t op_type, uint32_t value)
+{
+    (void)u;
+    (void)op_type;
+    (void)value;
+    return 0;
 }
 
 static int test_sender_routing_gates(void)
@@ -138,6 +147,154 @@ static int test_receiver_routing_gates(void)
     out_len = 123u;
     C(!num8lora_receiver_handle_data(&rx, out, 0u, apply_fn, &s, out, sizeof(out), &out_len));
     C(out_len == 0u);
+
+    return 0;
+}
+
+static int test_sender_init_and_transactional_enqueue(void)
+{
+    num8lora_sender_t snd;
+    num8lora_sender_op_t ops[3];
+    num8lora_sender_receiver_slot_t slots[2];
+    uint32_t out_first = 123u;
+    uint32_t out_last = 456u;
+    uint32_t op_id = 0u;
+    uint32_t before_latest = 0u;
+
+    num8lora_sender_init(&snd, 10u, 6001u, 25u, 2u, NULL, 1u, slots, 2u);
+    C(snd.ops == NULL && snd.op_capacity == 0u && snd.receivers == NULL && snd.receiver_capacity == 0u);
+    C(!num8lora_sender_enqueue_add(&snd, 1u, &op_id));
+    C(op_id == 0u);
+
+    num8lora_sender_init(&snd, 10u, 6001u, 25u, 2u, ops, 3u, NULL, 1u);
+    C(snd.ops == NULL && snd.op_capacity == 0u && snd.receivers == NULL && snd.receiver_capacity == 0u);
+    C(!num8lora_sender_enqueue_remove(&snd, 1u, &op_id));
+    C(op_id == 0u);
+
+    num8lora_sender_init(&snd, 10u, 6001u, 25u, 2u, ops, 3u, slots, 2u);
+    C(snd.ops == ops && snd.op_capacity == 3u);
+    C(snd.receivers == slots && snd.receiver_capacity == 2u);
+    C(num8lora_sender_register_receiver(&snd, 21u, 0u));
+
+    out_first = 99u;
+    out_last = 88u;
+    C(num8lora_sender_enqueue_lists(&snd, NULL, 0u, NULL, 0u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == 0u && snd.op_count == 0u);
+
+    out_first = 99u;
+    out_last = 88u;
+    C(!num8lora_sender_enqueue_lists(&snd, NULL, 1u, (uint32_t[]){ 7u }, 0u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == 0u && snd.op_count == 0u);
+
+    out_first = 99u;
+    out_last = 88u;
+    C(!num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 1u }, 0u, NULL, 1u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == 0u && snd.op_count == 0u);
+
+    out_first = 99u;
+    out_last = 88u;
+    C(!num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 1u }, 0u, (uint32_t[]){ 1u, 100000000u }, 2u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == 0u && snd.op_count == 0u);
+
+    out_first = 99u;
+    out_last = 88u;
+    C(!num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 1u, 2u }, 2u, (uint32_t[]){ 3u, 4u }, 2u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == 0u && snd.op_count == 0u);
+
+    out_first = 99u;
+    out_last = 88u;
+    C(num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 1u, 2u }, 2u, (uint32_t[]){ 3u }, 1u, &out_first, &out_last));
+    C(out_first == 1u && out_last == 3u);
+    C(snd.latest_op_id == 3u && snd.op_count == 3u);
+
+    before_latest = snd.latest_op_id;
+    C(!num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 5u }, 1u, (uint32_t[]){ 6u }, 1u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == before_latest && snd.op_count == 3u);
+
+    num8lora_sender_init(&snd, 10u, 6001u, 25u, 2u, ops, 3u, slots, 2u);
+    snd.latest_op_id = UINT32_MAX;
+    snd.oldest_retained_op_id = UINT32_MAX;
+    snd.op_count = 0u;
+    C(!num8lora_sender_enqueue_lists(&snd, (uint32_t[]){ 1u }, 1u, NULL, 0u, &out_first, &out_last));
+    C(out_first == 0u && out_last == 0u);
+    C(snd.latest_op_id == UINT32_MAX && snd.op_count == 0u);
+
+    return 0;
+}
+
+static int test_receiver_apply_transaction_semantics(void)
+{
+    num8lora_receiver_t rx;
+    state_t s = {0};
+    uint8_t data[128];
+    uint8_t resp[32];
+    uint32_t data_len = 0u;
+    uint32_t resp_len = 0u;
+    num8lora_op_data_payload_t d = {0};
+    num8lora_op_ack_payload_t ack = {0};
+    num8lora_op_nack_payload_t nack = {0};
+    num8lora_op_common_header_t hdr = {0};
+
+    num8lora_receiver_init(&rx, 21u, 10u, 7001u, 0u);
+
+    d.stream_id = rx.stream_id;
+    d.op_id = 1u;
+    d.op_type = NUM8LORA_OP_ADD;
+    d.value = 5u;
+    C(num8lora_op_encode_data(data, sizeof(data), 10u, 21u, 1u, &d, &data_len));
+
+    resp_len = 0u;
+    C(!num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, 17u, &resp_len));
+    C(resp_len == 0u && rx.last_applied_op_id == 0u && s.apply_calls == 0u);
+
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, NULL, &s, resp, sizeof(resp), &resp_len));
+    C(resp_len == 22u);
+    C(rx.last_applied_op_id == 0u && s.apply_calls == 0u);
+
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, fail_apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_nack(resp, resp_len, &hdr, &nack));
+    C(nack.error_code == NUM8LORA_OP_ERR_APPLY_FAILED);
+    C(rx.last_applied_op_id == 0u && s.apply_calls == 0u);
+
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_ack(resp, resp_len, &hdr, &ack));
+    C(ack.ack_op_id == 1u);
+    C(rx.last_applied_op_id == 1u && s.present[5] == 1 && s.apply_calls == 1u);
+
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_ack(resp, resp_len, &hdr, &ack));
+    C(ack.ack_op_id == 1u);
+    C(rx.last_applied_op_id == 1u && s.present[5] == 1 && s.apply_calls == 1u);
+
+    C(num8lora_op_encode_data(data, sizeof(data), 10u, 21u, 2u, &(num8lora_op_data_payload_t){ rx.stream_id, 1u, NUM8LORA_OP_ADD, 0u, 0u, 6u }, &data_len));
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_ack(resp, resp_len, &hdr, &ack));
+    C(ack.ack_op_id == 1u);
+    C(rx.last_applied_op_id == 1u && s.present[6] == 0 && s.apply_calls == 1u);
+
+    C(num8lora_op_encode_data(data, sizeof(data), 10u, 21u, 3u, &(num8lora_op_data_payload_t){ rx.stream_id, 2u, NUM8LORA_OP_ADD, 0u, 0u, 6u }, &data_len));
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_ack(resp, resp_len, &hdr, &ack));
+    C(ack.ack_op_id == 2u);
+    C(rx.last_applied_op_id == 2u && s.present[6] == 1 && s.apply_calls == 2u);
+
+    resp_len = 0u;
+    C(num8lora_receiver_handle_data(&rx, data, data_len, apply_fn, &s, resp, sizeof(resp), &resp_len));
+    C(num8lora_op_decode_ack(resp, resp_len, &hdr, &ack));
+    C(ack.ack_op_id == 2u);
+    C(rx.last_applied_op_id == 2u && s.present[6] == 1 && s.apply_calls == 2u);
 
     return 0;
 }
@@ -334,6 +491,8 @@ int main(void)
 {
     C(test_sender_routing_gates() == 0);
     C(test_receiver_routing_gates() == 0);
+    C(test_sender_init_and_transactional_enqueue() == 0);
+    C(test_receiver_apply_transaction_semantics() == 0);
     C(test_operation_history_lifecycle() == 0);
     C(test_slow_and_inactive_receiver_policy() == 0);
     C(test_history_nack_and_replay() == 0);

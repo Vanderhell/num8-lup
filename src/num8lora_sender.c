@@ -1,5 +1,6 @@
 #include "num8lora_sender.h"
 
+#include <stddef.h>
 #include <string.h>
 #include <limits.h>
 
@@ -147,6 +148,19 @@ static int request_is_within_sender_history(const num8lora_sender_t* s, const nu
     return 1;
 }
 
+static int sender_storage_pair_is_valid(const void* buf, uint32_t capacity, size_t elem_size)
+{
+    if (capacity == 0u)
+    {
+        return 1;
+    }
+    if (buf == NULL || elem_size == 0u)
+    {
+        return 0;
+    }
+    return (size_t)capacity <= (((size_t)-1) / elem_size);
+}
+
 static int emit_data(num8lora_sender_t* s, num8lora_sender_receiver_slot_t* slot, uint32_t op_id, uint8_t* out_buf, uint32_t out_cap, uint32_t* out_len, uint64_t now_ms)
 {
     const num8lora_sender_op_t* op = find_op(s, op_id);
@@ -198,6 +212,11 @@ void num8lora_sender_init(
     }
 
     memset(s, 0, sizeof(*s));
+    if (!sender_storage_pair_is_valid(ops_buf, ops_capacity, sizeof(*ops_buf)) ||
+        !sender_storage_pair_is_valid(receiver_buf, receiver_capacity, sizeof(*receiver_buf)))
+    {
+        return;
+    }
     s->sender_id = sender_id;
     s->seq = 1u;
     s->stream_id = stream_id;
@@ -211,9 +230,13 @@ void num8lora_sender_init(
     s->receivers = receiver_buf;
     s->receiver_capacity = receiver_capacity;
 
+    if (ops_buf != NULL && ops_capacity > 0u)
+    {
+        memset(ops_buf, 0, (size_t)ops_capacity * sizeof(*ops_buf));
+    }
     if (receiver_buf != NULL && receiver_capacity > 0u)
     {
-        memset(receiver_buf, 0, sizeof(*receiver_buf) * receiver_capacity);
+        memset(receiver_buf, 0, (size_t)receiver_capacity * sizeof(*receiver_buf));
     }
 }
 
@@ -350,15 +373,69 @@ int num8lora_sender_enqueue_lists(
     uint32_t i;
     uint32_t first = 0u;
     uint32_t last = 0u;
+    uint64_t total_count;
+    uint64_t projected_latest;
+
+    if (out_first_op_id != NULL)
+    {
+        *out_first_op_id = 0u;
+    }
+    if (out_last_op_id != NULL)
+    {
+        *out_last_op_id = 0u;
+    }
 
     if (s == NULL)
     {
         return 0;
     }
 
+    if ((remove_count != 0u && remove_values == NULL) || (add_count != 0u && add_values == NULL))
+    {
+        return 0;
+    }
+
+    total_count = (uint64_t)remove_count + (uint64_t)add_count;
+    if (total_count == 0u)
+    {
+        return 1;
+    }
+    if (total_count > UINT32_MAX)
+    {
+        return 0;
+    }
+    if (s->op_count > s->op_capacity)
+    {
+        return 0;
+    }
+    if (total_count > (uint64_t)(s->op_capacity - s->op_count))
+    {
+        return 0;
+    }
+    projected_latest = (uint64_t)s->latest_op_id + total_count;
+    if (projected_latest > UINT32_MAX)
+    {
+        return 0;
+    }
+
     for (i = 0; i < remove_count; ++i)
     {
-        if (!num8lora_sender_enqueue_remove(s, remove_values[i], &last))
+        if (remove_values[i] > MAX_VALUE)
+        {
+            return 0;
+        }
+    }
+    for (i = 0; i < add_count; ++i)
+    {
+        if (add_values[i] > MAX_VALUE)
+        {
+            return 0;
+        }
+    }
+
+    for (i = 0; i < remove_count; ++i)
+    {
+        if (!enqueue_op(s, NUM8LORA_OP_REMOVE, remove_values[i], &last))
         {
             return 0;
         }
@@ -370,7 +447,7 @@ int num8lora_sender_enqueue_lists(
 
     for (i = 0; i < add_count; ++i)
     {
-        if (!num8lora_sender_enqueue_add(s, add_values[i], &last))
+        if (!enqueue_op(s, NUM8LORA_OP_ADD, add_values[i], &last))
         {
             return 0;
         }
