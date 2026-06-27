@@ -41,6 +41,12 @@ int main(void)
     CHECK(num8lora_sender_on_ack_timeout(&s, upd2, sizeof(upd2), &upd2_len));
     CHECK(upd2_len == upd_len);
 
+    req[0] ^= 0x01u;
+    upd_len = 777u;
+    CHECK(!num8lora_sender_handle_update_request(&s, req, req_len, upd, sizeof(upd), &upd_len));
+    CHECK(upd_len == 0u);
+    CHECK(s.state == NUM8LORA_SENDER_WAIT_ACK);
+
     r.local_dataset_version = 8u;
     CHECK(num8lora_receiver_encode_ack(&r, 10u, 101u, ack, sizeof(ack), &ack_len));
 

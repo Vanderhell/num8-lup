@@ -5,6 +5,17 @@
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL line %d\n", __LINE__); return 1; } } while (0)
 
+static int beacon_payload_equal(const num8lora_beacon_payload_t* a, const num8lora_beacon_payload_t* b)
+{
+    return a->current_update_id == b->current_update_id
+        && a->dataset_version_from == b->dataset_version_from
+        && a->dataset_version_to == b->dataset_version_to
+        && a->remove_count == b->remove_count
+        && a->add_count == b->add_count
+        && a->update_payload_size == b->update_payload_size
+        && a->update_payload_crc16 == b->update_payload_crc16;
+}
+
 static int test_beacon(void)
 {
     uint8_t buf[64];
@@ -29,7 +40,7 @@ static int test_beacon(void)
     CHECK(hdr.sender_id == 77u);
     CHECK(hdr.receiver_id == 0u);
     CHECK(hdr.seq == 5u);
-    CHECK(memcmp(&in_pl, &out_pl, sizeof(in_pl)) == 0);
+    CHECK(beacon_payload_equal(&in_pl, &out_pl));
 
     buf[3] ^= 0x01u;
     CHECK(!num8lora_validate_frame_crc(buf, len));
@@ -99,11 +110,46 @@ static int test_validate_lists(void)
     return 0;
 }
 
+static int test_failure_outputs(void)
+{
+    uint8_t buf[32] = {0};
+    uint32_t len = 123u;
+    num8lora_common_header_t hdr;
+    num8lora_beacon_payload_t beacon = {1u, 2u, 3u, 4u, 5u, 6u, 7u};
+    uint16_t err = 0xFFFFu;
+    num8lora_update_request_payload_t req = {1u, 2u};
+
+    CHECK(!num8lora_encode_beacon(buf, 10u, 1u, 1u, &beacon, &len));
+    CHECK(len == 0u);
+
+    CHECK(!num8lora_decode_common_header(buf, 0u, &hdr));
+    CHECK(hdr.protocol_version == 0u && hdr.msg_type == 0u && hdr.sender_id == 0u && hdr.receiver_id == 0u && hdr.seq == 0u);
+
+    CHECK(!num8lora_decode_beacon(buf, 0u, &hdr, &beacon));
+    CHECK(beacon.current_update_id == 0u);
+    CHECK(beacon.dataset_version_from == 0u);
+    CHECK(beacon.dataset_version_to == 0u);
+    CHECK(beacon.remove_count == 0u);
+    CHECK(beacon.add_count == 0u);
+    CHECK(beacon.update_payload_size == 0u);
+    CHECK(beacon.update_payload_crc16 == 0u);
+
+    CHECK(!num8lora_classify_frame(buf, 0u, 0u, 0u, &hdr, &err));
+    CHECK(err == NUM8LORA_ERR_CRC_FAIL);
+    CHECK(hdr.protocol_version == 0u && hdr.msg_type == 0u && hdr.sender_id == 0u && hdr.receiver_id == 0u && hdr.seq == 0u);
+
+    CHECK(!num8lora_decode_update_request(buf, 0u, &hdr, &req));
+    CHECK(req.requested_update_id == 0u && req.receiver_dataset_ver == 0u);
+
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_beacon() == 0);
     CHECK(test_update_data() == 0);
     CHECK(test_validate_lists() == 0);
+    CHECK(test_failure_outputs() == 0);
     printf("num8lora_test OK\n");
     return 0;
 }

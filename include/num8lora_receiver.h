@@ -22,7 +22,7 @@ typedef struct num8lora_receiver_s
 
 NUM8LORA_OP_API void num8lora_receiver_init(num8lora_receiver_t* r, uint16_t receiver_id, uint16_t expected_sender_id, uint32_t stream_id, uint32_t last_applied_op_id);
 
-NUM8LORA_OP_API int num8lora_receiver_handle_beacon(
+NUM8LORA_OP_API num8lora_op_status_t num8lora_receiver_handle_beacon(
     num8lora_receiver_t* r,
     const uint8_t* in_buf,
     uint32_t in_len,
@@ -30,7 +30,7 @@ NUM8LORA_OP_API int num8lora_receiver_handle_beacon(
     uint32_t out_cap,
     uint32_t* out_len);
 
-NUM8LORA_OP_API int num8lora_receiver_handle_data(
+NUM8LORA_OP_API num8lora_op_status_t num8lora_receiver_handle_data(
     num8lora_receiver_t* r,
     const uint8_t* in_buf,
     uint32_t in_len,
@@ -42,7 +42,7 @@ NUM8LORA_OP_API int num8lora_receiver_handle_data(
 
 #ifdef NUM8LORA_ENABLE_NUM8
 #include "num8.h"
-NUM8LORA_OP_API int num8lora_receiver_apply_num8(void* user, uint8_t op_type, uint32_t value);
+NUM8LORA_OP_API num8lora_op_status_t num8lora_receiver_apply_num8(void* user, uint8_t op_type, uint32_t value);
 #endif
 
 #ifdef __cplusplus

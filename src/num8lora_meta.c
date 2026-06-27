@@ -69,6 +69,14 @@ int num8lora_load_receiver_meta(const char* path, uint32_t* out_dataset_version,
     uint16_t crc;
     FILE* f;
 
+    if (out_dataset_version != NULL)
+    {
+        *out_dataset_version = 0u;
+    }
+    if (out_last_applied_update_id != NULL)
+    {
+        *out_last_applied_update_id = 0u;
+    }
     if (path == NULL || out_dataset_version == NULL || out_last_applied_update_id == NULL)
     {
         return 0;

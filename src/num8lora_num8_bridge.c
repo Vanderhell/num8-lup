@@ -14,6 +14,14 @@ int num8lora_apply_update_to_num8(
 {
     uint32_t i;
     uint16_t err = NUM8LORA_ERR_NONE;
+    if (out_new_dataset_version != 0)
+    {
+        *out_new_dataset_version = 0u;
+    }
+    if (out_new_last_applied_update_id != 0)
+    {
+        *out_new_last_applied_update_id = 0u;
+    }
     if (out_error_code != 0)
     {
         *out_error_code = NUM8LORA_ERR_NONE;
@@ -111,8 +119,8 @@ int num8lora_receiver_apply_update_data_to_num8(
     uint32_t* out_response_len,
     uint16_t* out_error_code)
 {
-    num8lora_common_header_t hdr;
-    num8lora_update_header_t up;
+    num8lora_common_header_t hdr = {0};
+    num8lora_update_header_t up = {0};
     uint16_t err = NUM8LORA_ERR_NONE;
     uint32_t remove_numbers[255];
     uint32_t add_numbers[255];
@@ -122,6 +130,10 @@ int num8lora_receiver_apply_update_data_to_num8(
     if (out_error_code != 0)
     {
         *out_error_code = NUM8LORA_ERR_NONE;
+    }
+    if (out_response_len != 0)
+    {
+        *out_response_len = 0u;
     }
 
     if (ctx == 0 || engine == 0 || update_buf == 0 || out_response_buf == 0 || out_response_len == 0)

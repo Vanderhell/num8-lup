@@ -93,6 +93,10 @@ int num8lora_sender_build_beacon(num8lora_sender_ctx_t* ctx, uint8_t* out_buf, u
 {
     num8lora_beacon_payload_t p;
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || out_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -131,10 +135,14 @@ int num8lora_sender_handle_update_request(
     uint32_t out_cap,
     uint32_t* out_len)
 {
-    num8lora_common_header_t hdr;
+    num8lora_common_header_t hdr = {0};
     num8lora_update_request_payload_t req;
     uint16_t err = NUM8LORA_ERR_NONE;
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || req_buf == NULL || out_response_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -144,10 +152,14 @@ int num8lora_sender_handle_update_request(
         return 0;
     }
 
-    if (!num8lora_classify_frame(req_buf, req_len, ctx->sender_id, NUM8LORA_MSG_UPDATE_REQUEST, &hdr, &err)
-        || !num8lora_decode_update_request(req_buf, req_len, &hdr, &req))
+    if (!num8lora_classify_frame(req_buf, req_len, ctx->sender_id, NUM8LORA_MSG_UPDATE_REQUEST, &hdr, &err))
     {
-        num8lora_nack_payload_t nack;
+        return 0;
+    }
+
+    if (!num8lora_decode_update_request(req_buf, req_len, &hdr, &req))
+    {
+        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = ctx->update_hdr.update_id;
         nack.error_code = err == NUM8LORA_ERR_NONE ? NUM8LORA_ERR_INTERNAL : err;
         nack.detail = 0u;
@@ -158,7 +170,7 @@ int num8lora_sender_handle_update_request(
 
     if (req.requested_update_id != ctx->update_hdr.update_id)
     {
-        num8lora_nack_payload_t nack;
+        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = req.requested_update_id;
         nack.error_code = NUM8LORA_ERR_UPDATE_ID_UNKNOWN;
         nack.detail = 0u;
@@ -169,7 +181,7 @@ int num8lora_sender_handle_update_request(
 
     if (req.receiver_dataset_ver != ctx->update_hdr.dataset_version_from)
     {
-        num8lora_nack_payload_t nack;
+        num8lora_nack_payload_t nack = {0};
         nack.nack_update_id = req.requested_update_id;
         nack.error_code = NUM8LORA_ERR_DATASET_VERSION_MISMATCH;
         nack.detail = 0u;
@@ -191,7 +203,7 @@ int num8lora_sender_handle_ack_or_nack(
     num8lora_sender_ack_result_t* out_result,
     uint16_t* out_nack_error_code)
 {
-    num8lora_common_header_t hdr;
+    num8lora_common_header_t hdr = {0};
     uint16_t err = NUM8LORA_ERR_NONE;
 
     if (out_result != NULL)
@@ -260,6 +272,10 @@ int num8lora_sender_on_ack_timeout(
     uint32_t out_cap,
     uint32_t* out_len)
 {
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || out_update_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -308,11 +324,15 @@ int num8lora_receiver_handle_beacon(
     uint32_t out_cap,
     uint32_t* out_len)
 {
-    num8lora_common_header_t hdr;
-    num8lora_beacon_payload_t p;
+    num8lora_common_header_t hdr = {0};
+    num8lora_beacon_payload_t p = {0};
     uint16_t err = NUM8LORA_ERR_NONE;
-    num8lora_update_request_payload_t req;
+    num8lora_update_request_payload_t req = {0};
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || beacon_buf == NULL || out_request_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -355,8 +375,12 @@ int num8lora_receiver_on_update_timeout(
     uint32_t out_cap,
     uint32_t* out_len)
 {
-    num8lora_update_request_payload_t req;
+    num8lora_update_request_payload_t req = {0};
 
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || out_request_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -386,16 +410,20 @@ int num8lora_receiver_validate_update_data(
     uint32_t* out_add_numbers,
     uint16_t* out_error_code)
 {
-    num8lora_common_header_t hdr;
-    num8lora_update_header_t up;
-    const uint8_t* rp;
-    const uint8_t* ap;
+    num8lora_common_header_t hdr = {0};
+    num8lora_update_header_t up = {0};
+    const uint8_t* rp = NULL;
+    const uint8_t* ap = NULL;
     uint16_t err = NUM8LORA_ERR_NONE;
     uint16_t payload_crc = 0;
 
     if (out_error_code != NULL)
     {
         *out_error_code = NUM8LORA_ERR_NONE;
+    }
+    if (out_hdr != NULL)
+    {
+        memset(out_hdr, 0, sizeof(*out_hdr));
     }
     if (ctx == NULL || update_buf == NULL || out_hdr == NULL)
     {
@@ -523,7 +551,11 @@ int num8lora_receiver_encode_ack(
     uint32_t out_cap,
     uint32_t* out_len)
 {
-    num8lora_ack_payload_t p;
+    num8lora_ack_payload_t p = {0};
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || out_ack_buf == NULL || out_len == NULL)
     {
         return 0;
@@ -543,7 +575,11 @@ int num8lora_receiver_encode_nack(
     uint32_t out_cap,
     uint32_t* out_len)
 {
-    num8lora_nack_payload_t p;
+    num8lora_nack_payload_t p = {0};
+    if (out_len != NULL)
+    {
+        *out_len = 0u;
+    }
     if (ctx == NULL || out_nack_buf == NULL || out_len == NULL)
     {
         return 0;
