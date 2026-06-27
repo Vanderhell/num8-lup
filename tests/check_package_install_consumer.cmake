@@ -4,6 +4,11 @@ endif()
 
 set(install_prefix "${NUM8LORA_TEST_BUILD_DIR}/install")
 set(consumer_build "${NUM8LORA_TEST_BUILD_DIR}/consumer-build")
+set(consumer_bin_dir "${consumer_build}")
+set(consumer_exe_suffix "")
+if(WIN32)
+    set(consumer_exe_suffix ".exe")
+endif()
 
 file(REMOVE_RECURSE "${NUM8LORA_TEST_BUILD_DIR}")
 file(MAKE_DIRECTORY "${NUM8LORA_TEST_BUILD_DIR}")
@@ -33,15 +38,19 @@ if(NOT build_result EQUAL 0)
     message(FATAL_ERROR "consumer build failed")
 endif()
 
+if(EXISTS "${consumer_build}/Release")
+    set(consumer_bin_dir "${consumer_build}/Release")
+endif()
+
 execute_process(
-    COMMAND "${consumer_build}/Release/package_consumer_legacy.exe"
+    COMMAND "${consumer_bin_dir}/package_consumer_legacy${consumer_exe_suffix}"
     RESULT_VARIABLE legacy_run_result)
 if(NOT legacy_run_result EQUAL 0)
     message(FATAL_ERROR "legacy consumer run failed")
 endif()
 
 execute_process(
-    COMMAND "${consumer_build}/Release/package_consumer_async.exe"
+    COMMAND "${consumer_bin_dir}/package_consumer_async${consumer_exe_suffix}"
     RESULT_VARIABLE async_run_result)
 if(NOT async_run_result EQUAL 0)
     message(FATAL_ERROR "async consumer run failed")
@@ -49,7 +58,7 @@ endif()
 
 if(NUM8LORA_EXPECT_HOSTED_METADATA)
     execute_process(
-        COMMAND "${consumer_build}/Release/package_consumer_metadata.exe"
+        COMMAND "${consumer_bin_dir}/package_consumer_metadata${consumer_exe_suffix}"
         RESULT_VARIABLE metadata_run_result)
     if(NOT metadata_run_result EQUAL 0)
         message(FATAL_ERROR "metadata consumer run failed")

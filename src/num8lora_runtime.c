@@ -1,6 +1,5 @@
 #include "num8lora.h"
-
-#include <string.h>
+#include "num8lora_codec.h"
 
 static uint32_t update_payload_size(uint8_t remove_count, uint8_t add_count)
 {
@@ -13,7 +12,7 @@ void num8lora_sender_init(num8lora_sender_ctx_t* ctx, uint16_t sender_id, uint8_
     {
         return;
     }
-    memset(ctx, 0, sizeof(*ctx));
+    num8lora_codec_zero_bytes(ctx, (uint32_t)sizeof(*ctx));
     ctx->state = NUM8LORA_SENDER_IDLE;
     ctx->sender_id = sender_id;
     ctx->max_retries = max_retries;
@@ -355,7 +354,7 @@ void num8lora_receiver_init(
     {
         return;
     }
-    memset(ctx, 0, sizeof(*ctx));
+    num8lora_codec_zero_bytes(ctx, (uint32_t)sizeof(*ctx));
     ctx->state = NUM8LORA_RECEIVER_SCAN;
     ctx->receiver_id = receiver_id;
     ctx->expected_sender_id = expected_sender_id;
@@ -512,7 +511,7 @@ int num8lora_receiver_validate_update_data(
     }
     if (out_hdr != NULL)
     {
-        memset(out_hdr, 0, sizeof(*out_hdr));
+        num8lora_codec_zero_bytes(out_hdr, (uint32_t)sizeof(*out_hdr));
     }
     if (out_required_remove_count != NULL)
     {

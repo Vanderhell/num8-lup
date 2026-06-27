@@ -1,7 +1,7 @@
 #include "num8lora_sender.h"
+#include "num8lora_codec.h"
 
 #include <stddef.h>
-#include <string.h>
 #include <limits.h>
 
 #define MAX_VALUE 99999999u
@@ -186,7 +186,7 @@ void num8lora_sender_init(
         return;
     }
 
-    memset(s, 0, sizeof(*s));
+    num8lora_codec_zero_bytes(s, (uint32_t)sizeof(*s));
     if (!sender_storage_pair_is_valid(ops_buf, ops_capacity, sizeof(*ops_buf)) ||
         !sender_storage_pair_is_valid(receiver_buf, receiver_capacity, sizeof(*receiver_buf)))
     {
@@ -207,11 +207,11 @@ void num8lora_sender_init(
 
     if (ops_buf != NULL && ops_capacity > 0u)
     {
-        memset(ops_buf, 0, (size_t)ops_capacity * sizeof(*ops_buf));
+        num8lora_codec_zero_bytes(ops_buf, (uint32_t)((size_t)ops_capacity * sizeof(*ops_buf)));
     }
     if (receiver_buf != NULL && receiver_capacity > 0u)
     {
-        memset(receiver_buf, 0, (size_t)receiver_capacity * sizeof(*receiver_buf));
+        num8lora_codec_zero_bytes(receiver_buf, (uint32_t)((size_t)receiver_capacity * sizeof(*receiver_buf)));
     }
 }
 

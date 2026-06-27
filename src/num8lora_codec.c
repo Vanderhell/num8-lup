@@ -79,3 +79,19 @@ int num8lora_codec_mul_u32(uint32_t a, uint32_t b, uint32_t* out)
     *out = (uint32_t)prod;
     return 1;
 }
+
+void num8lora_codec_zero_bytes(void* p, uint32_t len)
+{
+    uint8_t* b = (uint8_t*)p;
+    uint32_t i;
+
+    if (b == NULL)
+    {
+        return;
+    }
+
+    for (i = 0u; i < len; ++i)
+    {
+        b[i] = 0u;
+    }
+}

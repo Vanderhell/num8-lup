@@ -2,7 +2,6 @@
 #include "num8lora_codec.h"
 
 #include <stddef.h>
-#include <string.h>
 
 #define NUM8LORA_METADATA_MAGIC0 'N'
 #define NUM8LORA_METADATA_MAGIC1 '8'
@@ -91,7 +90,7 @@ num8lora_metadata_status_t num8lora_metadata_decode_record(
 
     if (out_record != NULL)
     {
-        memset(out_record, 0, sizeof(*out_record));
+        num8lora_codec_zero_bytes(out_record, (uint32_t)sizeof(*out_record));
     }
     if (out_error_code != NULL)
     {
