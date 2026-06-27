@@ -245,7 +245,7 @@ int num8lora_sender_register_receiver(num8lora_sender_t* s, uint16_t receiver_id
 
 int num8lora_sender_set_receiver_progress(num8lora_sender_t* s, uint16_t receiver_id, uint32_t last_acked_op_id)
 {
-    num8lora_sender_receiver_slot_t* slot;
+    const num8lora_sender_receiver_slot_t* slot;
     if (s == NULL)
     {
         return 0;
@@ -583,7 +583,7 @@ int num8lora_sender_poll_tx(
         }
 
         target = slot->last_acked_op_id + 1u;
-        if (target == 0u || target > s->latest_op_id || target < s->oldest_retained_op_id)
+        if (target > s->latest_op_id || target < s->oldest_retained_op_id)
         {
             continue;
         }

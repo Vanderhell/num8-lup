@@ -98,7 +98,7 @@ int num8lora_sender_build_beacon(num8lora_sender_ctx_t* ctx, uint8_t* out_buf, u
     {
         *out_len = 0u;
     }
-    if (ctx == NULL || out_buf == NULL || out_len == NULL)
+    if (ctx == NULL || out_buf == NULL)
     {
         return 0;
     }
@@ -111,10 +111,6 @@ int num8lora_sender_build_beacon(num8lora_sender_ctx_t* ctx, uint8_t* out_buf, u
     p.update_payload_size = (uint16_t)(16u + 4u * (uint16_t)p.remove_count + 4u * (uint16_t)p.add_count);
     p.update_payload_crc16 = ctx->update_payload_crc16;
 
-    if (out_len == NULL || out_buf == NULL)
-    {
-        return 0;
-    }
     if (out_cap < 28u)
     {
         return 0;
@@ -484,7 +480,7 @@ int num8lora_receiver_on_update_timeout(
 }
 
 int num8lora_receiver_validate_update_data(
-    num8lora_receiver_ctx_t* ctx,
+    const num8lora_receiver_ctx_t* ctx,
     const uint8_t* update_buf,
     uint32_t update_len,
     num8lora_update_header_t* out_hdr,

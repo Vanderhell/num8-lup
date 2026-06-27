@@ -338,7 +338,7 @@ NUM8LORA_API num8lora_status_t num8lora_receiver_on_update_timeout(
     uint32_t out_cap,
     uint32_t* out_len);
 NUM8LORA_API num8lora_status_t num8lora_receiver_validate_update_data(
-    num8lora_receiver_ctx_t* ctx,
+    const num8lora_receiver_ctx_t* ctx,
     const uint8_t* update_buf,
     uint32_t update_len,
     num8lora_update_header_t* out_hdr,
