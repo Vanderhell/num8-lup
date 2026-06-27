@@ -116,7 +116,7 @@ static int test_file_io(void)
 
     f = open_file_write(trailing_path);
     CHECK(f != NULL);
-    CHECK(fwrite(buf, 1u, len, f) == len);
+    CHECK(fwrite(buf, 1u, (size_t)len, f) == (size_t)len);
     ch = fputc('X', f);
     CHECK(ch != EOF);
     CHECK(fclose(f) == 0);
@@ -125,7 +125,7 @@ static int test_file_io(void)
 
     f = open_file_write(truncated_path);
     CHECK(f != NULL);
-    CHECK(fwrite(buf, 1u, len - 1u, f) == len - 1u);
+    CHECK(fwrite(buf, 1u, (size_t)(len - 1u), f) == (size_t)(len - 1u));
     CHECK(fclose(f) == 0);
     CHECK(!num8lora_metadata_load_file(truncated_path, &out, &err));
     CHECK(err == NUM8LORA_METADATA_ERR_LENGTH);

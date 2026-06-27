@@ -49,7 +49,7 @@ static int write_record_file(FILE* f, const uint8_t* buf, uint32_t len)
         return 0;
     }
 
-    ok = (fwrite(buf, 1u, len, f) == len);
+    ok = (fwrite(buf, 1u, (size_t)len, f) == (size_t)len);
     if (ok)
     {
         ok = (fflush(f) == 0);
